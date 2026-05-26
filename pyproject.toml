@@ -4,9 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "slack-project"
-version = "0.1.1"
+version = "0.1.2"
 requires-python = ">=3.11"
-dependencies = ["ghdag"]
+dependencies = ["ghdag", "requests"]
 
 [project.optional-dependencies]
 dev = ["pytest"]
