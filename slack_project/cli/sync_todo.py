@@ -12,9 +12,13 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         from slack_project.todo.sync import run
-        result = run(project=args.project, fetch_only=args.fetch_only, check_only=args.check_only, dry_run=args.dry_run)
-        print(result)
-        return 0
+        success, message = run(project=args.project, fetch_only=args.fetch_only, check_only=args.check_only, dry_run=args.dry_run)
+        if success:
+            print(message)
+            return 0
+        else:
+            print(f"Error: {message}", file=sys.stderr)
+            return 1
     except (ImportError, NotImplementedError) as e:
         print(f"Not implemented: {e}", file=sys.stderr)
         return 1

@@ -14,7 +14,7 @@ def main(argv: list[str] | None = None) -> int:
         count = fetch_weekly_logs(project=args.project, from_date=args.from_date, safe_ratelimit=args.safe_ratelimit)
         print(f"Fetched {count} logs")
         return 0
-    except (ImportError, NotImplementedError) as e:
+    except (ImportError, NotImplementedError, TypeError) as e:
         print(f"Not implemented: {e}", file=sys.stderr)
         return 1
 
