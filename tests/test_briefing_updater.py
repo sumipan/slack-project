@@ -1,7 +1,6 @@
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-import pytest
 
 from slack_project.briefing.updater import get_briefing_path, update_canvas
 

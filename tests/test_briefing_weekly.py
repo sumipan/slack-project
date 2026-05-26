@@ -1,10 +1,7 @@
-import json
 from datetime import datetime
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
-import pytest
 
 from slack_project.briefing.weekly import (
     _calc_period,
