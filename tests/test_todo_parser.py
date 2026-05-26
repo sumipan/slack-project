@@ -1,6 +1,5 @@
 from datetime import datetime
 
-import pytest
 
 from slack_project.todo.parser import (
     normalize_task_text,

@@ -1,16 +1,12 @@
 import json
-import tempfile
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from slack_project.todo.sync import (
     apply_list_to_todo,
     build_entries_for_list,
     parse_list_entries_from_cache,
     run,
-    write_entries_cache,
 )
 
 
