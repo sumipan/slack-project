@@ -10,3 +10,8 @@ dependencies = ["ghdag", "requests"]
 
 [project.optional-dependencies]
 dev = ["pytest"]
+
+[project.scripts]
+slack-project-fetch-logs = "slack_project.cli.fetch_logs:main"
+slack-project-post-docs = "slack_project.cli.post_docs:main"
+slack-project-sync-todo = "slack_project.cli.sync_todo:main"
