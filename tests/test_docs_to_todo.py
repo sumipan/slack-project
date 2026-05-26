@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 from slack_project.docs.parser import ParsedMinutes, Task
 from slack_project.docs.to_todo import extract_tasks, build_todo_section, TodoItem
 

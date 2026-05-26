@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 from slack_project.docs.parser import Task
 from slack_project.docs.formatter import (
     format_head_blocks,

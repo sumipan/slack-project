@@ -4,7 +4,7 @@ import importlib.util
 from pathlib import Path
 
 import pytest
-from slack_project.docs.parser import parse_minutes, ParsedMinutes, Task
+from slack_project.docs.parser import parse_minutes, ParsedMinutes
 
 SAMPLE_MARKDOWN = """\
 # 2026-03-01 定例

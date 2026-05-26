@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from slack_project.docs.parser import ParsedMinutes, Task
+from slack_project.docs.parser import ParsedMinutes
 
 
 @dataclass
