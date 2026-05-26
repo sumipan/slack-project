@@ -6,7 +6,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
-import pytest
 
 from slack_project.slack.fetch import fetch_weekly_logs, get_week_ranges
 from slack_project.slack.client import SlackClient
