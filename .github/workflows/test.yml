@@ -14,6 +14,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - run: pip install "ghdag @ git+https://github.com/sumipan/ghdag.git@main"
       - run: pip install -e ".[dev]"
       - run: pytest -q
       - run: ruff check .
