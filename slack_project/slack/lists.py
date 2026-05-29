@@ -200,8 +200,8 @@ def get_column_ids(
 
 def list_entries(
     client, list_id: str, status_column_id: str | None = None
-) -> list[tuple[str, bool, str]]:
-    result: list[tuple[str, bool, str]] = []
+) -> list[tuple[str, bool, str | None]]:
+    result: list[tuple[str, bool, str | None]] = []
     cursor = None
     while True:
         page, cursor = _slack_lists_items_list_page(client, list_id, cursor=cursor)

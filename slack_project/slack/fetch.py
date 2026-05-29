@@ -76,7 +76,7 @@ def fetch_weekly_logs(
         try:
             oldest = str(sat.timestamp())
             latest = str(fri.timestamp())
-            messages = []
+            messages: list[dict] = []
             cursor = None
 
             while True:

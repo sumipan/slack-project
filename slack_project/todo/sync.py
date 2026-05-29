@@ -17,7 +17,7 @@ from slack_project.todo import parser as _parser
 # ---------------------------------------------------------------------------
 
 
-def parse_list_entries_from_cache(cache_path: Path) -> list[tuple[str, bool, str]]:
+def parse_list_entries_from_cache(cache_path: Path) -> list[tuple[str, bool, str | None]]:
     """JSON キャッシュからエントリを復元。"""
     if not cache_path.exists():
         return []
