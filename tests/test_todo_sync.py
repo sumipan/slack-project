@@ -3,11 +3,20 @@ from unittest.mock import MagicMock, patch
 
 
 from slack_project.todo.sync import (
+    _resolve_slack_lists_module,
     apply_list_to_todo,
     build_entries_for_list,
     parse_list_entries_from_cache,
     run,
 )
+from slack_project.workspace import ProjectWorkspace
+
+
+def _ws(tmp_path):
+    return ProjectWorkspace(
+        projects_root=tmp_path / "projects",
+        queue_dir=tmp_path / "jobs",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -148,8 +157,16 @@ def _make_config(list_id="L001", token="xoxp-test"):
     return {"slack": {"list_id": list_id, "user_token": token}, "members": {}}
 
 
+def test_resolve_slack_lists_module_default():
+    mod, err = _resolve_slack_lists_module(None)
+    assert err is None
+    assert mod.__name__ == "slack_project.slack.lists"
+
+
 def test_run_project_dir_missing(tmp_path):
+    ws = _ws(tmp_path)
     success, msg = run(
+        ws,
         "nonexistent",
         project_root=tmp_path / "nonexistent",
     )
@@ -158,16 +175,19 @@ def test_run_project_dir_missing(tmp_path):
 
 
 def test_run_todo_missing(tmp_path):
+    ws = _ws(tmp_path)
     proj = tmp_path / "myproject"
     proj.mkdir()
-    success, msg = run("myproject", project_root=proj)
+    success, msg = run(ws, "myproject", project_root=proj)
     assert success is False
     assert "todo.md" in msg
 
 
 def test_run_check_only(tmp_path):
+    ws = _ws(tmp_path)
     proj = _make_project_dir(tmp_path)
     success, msg = run(
+        ws,
         "myproject",
         check_only=True,
         project_root=proj,
@@ -180,8 +200,10 @@ def test_run_check_only(tmp_path):
 
 
 def test_run_dry_run(tmp_path):
+    ws = _ws(tmp_path)
     proj = _make_project_dir(tmp_path)
     success, msg = run(
+        ws,
         "myproject",
         dry_run=True,
         project_root=proj,
@@ -194,8 +216,10 @@ def test_run_dry_run(tmp_path):
 
 
 def test_run_fetch_only_no_cache(tmp_path):
+    ws = _ws(tmp_path)
     proj = _make_project_dir(tmp_path)
     success, msg = run(
+        ws,
         "myproject",
         fetch_only=True,
         project_root=proj,
@@ -207,8 +231,10 @@ def test_run_fetch_only_no_cache(tmp_path):
 
 
 def test_run_normal_no_list_id(tmp_path):
+    ws = _ws(tmp_path)
     proj = _make_project_dir(tmp_path)
     success, msg = run(
+        ws,
         "myproject",
         project_root=proj,
         load_config=lambda p: _make_config(list_id=None, token=None),
@@ -220,8 +246,10 @@ def test_run_normal_no_list_id(tmp_path):
 
 
 def test_run_normal_no_token(tmp_path):
+    ws = _ws(tmp_path)
     proj = _make_project_dir(tmp_path)
     success, msg = run(
+        ws,
         "myproject",
         project_root=proj,
         load_config=lambda p: _make_config(list_id="L001", token=None),
@@ -233,6 +261,7 @@ def test_run_normal_no_token(tmp_path):
 
 
 def test_run_with_slack_api_mock(tmp_path):
+    ws = _ws(tmp_path)
     proj = _make_project_dir(tmp_path)
     mock_sl = MagicMock()
     mock_sl.list_entries.return_value = [("タスクA", True, "e1")]
@@ -243,6 +272,7 @@ def test_run_with_slack_api_mock(tmp_path):
     # WebClient is imported lazily inside run(), so patch slack_sdk module
     with patch.dict("sys.modules", {"slack_sdk": MagicMock(WebClient=MagicMock(return_value=mock_web_client))}):
         success, msg = run(
+            ws,
             "myproject",
             project_root=proj,
             load_config=lambda p: _make_config(),

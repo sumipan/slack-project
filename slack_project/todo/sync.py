@@ -2,7 +2,7 @@
 slack_project.todo.sync — todo.md ↔ Slack Lists 双方向同期
 
 公開 API:
-    run(project, *, fetch_only, check_only, dry_run) -> tuple[bool, str]
+    run(workspace, project, *, fetch_only, check_only, dry_run) -> tuple[bool, str]
 """
 from __future__ import annotations
 
@@ -10,15 +10,10 @@ import json
 from pathlib import Path
 
 from slack_project.todo import parser as _parser
-
-
-# ---------------------------------------------------------------------------
-# 内部関数
-# ---------------------------------------------------------------------------
+from slack_project.workspace import ProjectWorkspace, normalize_project_name
 
 
 def parse_list_entries_from_cache(cache_path: Path) -> list[tuple[str, bool, str | None]]:
-    """JSON キャッシュからエントリを復元。"""
     if not cache_path.exists():
         return []
     try:
@@ -33,7 +28,6 @@ def parse_list_entries_from_cache(cache_path: Path) -> list[tuple[str, bool, str
 
 
 def write_entries_cache(entries: list, cache_path: Path) -> None:
-    """エントリを JSON キャッシュに永続化。"""
     payload = {
         "entries": [
             {"title": body, "checked": completed, "id": eid}
@@ -44,7 +38,6 @@ def write_entries_cache(entries: list, cache_path: Path) -> None:
 
 
 def apply_list_to_todo(todo_path: Path, entries: list) -> None:
-    """List の完了状態を todo.md に反映。"""
     if not entries:
         return
     list_checked = {
@@ -87,7 +80,6 @@ def build_entries_for_list(
     todo_tasks: list,
     existing_entries: list,
 ) -> list:
-    """todo.md タスクと既存エントリをマージ。完了済み [x] の新規追加は除外。"""
     seen: set[str] = set()
     out: list[tuple[str, bool, str | None]] = []
     todo_by_norm = {norm: completed for (_, completed, norm, _, _) in todo_tasks}
@@ -107,22 +99,15 @@ def build_entries_for_list(
 
 
 def _resolve_slack_lists_module(slack_lists):
-    """slack_lists モジュールを返す。未指定時は tools.project.slack_lists を import する。"""
     if slack_lists is not None:
         return slack_lists, None
-    try:
-        from tools.project import slack_lists as _sl
-        return _sl, None
-    except ImportError:
-        return None, "slack_lists モジュールが見つかりません。slack_lists を引数で渡してください。"
+    from slack_project.slack import lists as _sl
 
-
-# ---------------------------------------------------------------------------
-# 公開 API
-# ---------------------------------------------------------------------------
+    return _sl, None
 
 
 def run(
+    workspace: ProjectWorkspace,
     project: str,
     *,
     fetch_only: bool = False,
@@ -133,31 +118,15 @@ def run(
     get_token=None,
     slack_lists=None,
 ) -> tuple[bool, str]:
-    """
-    Slack List と todo.md を同期する。
-
-    Args:
-        project: プロジェクト名（例: craftsake）
-        fetch_only: True の場合、Slack → todo.md 方向のみ
-        check_only: True の場合、不一致を検出・表示するのみ（書き込みなし）
-        dry_run: True の場合、書き込みを行わず動作確認のみ
-        project_root: プロジェクトルートパス（省略時は config から解決）
-        load_config: 設定ローダー関数（省略時は slack_project.config を使用）
-        get_token: トークン取得関数（省略時は slack_project.config を使用）
-        slack_lists: slack_lists モジュール（省略時は slack_project.slack.lists を参照）
-
-    Returns:
-        (success: bool, message: str)
-    """
     messages: list[str] = []
 
-    # デフォルトの設定ローダーを解決
     if load_config is None or get_token is None:
         try:
             from slack_project.config_loader import (
                 load_project_config as _load,
                 get_slack_token as _get_token,
             )
+
             if load_config is None:
                 load_config = _load
             if get_token is None:
@@ -165,31 +134,9 @@ def run(
         except ImportError:
             return False, "設定ローダーが見つかりません。load_config / get_token を引数で渡してください。"
 
-    if slack_lists is None:
-        try:
-            from slack_project.slack import lists as _sl
-            slack_lists = _sl
-        except ImportError:
-            return False, "slack_lists モジュールが見つかりません。slack_lists を引数で渡してください。"
-
-    # プロジェクトパス解決
+    project_name = normalize_project_name(project)
     if project_root is None:
-        project_arg = (project or "").strip().replace("\\", "/")
-        if project_arg.startswith("projects/"):
-            parts = project_arg.split("/")
-            project_name = parts[1] if len(parts) > 1 else parts[0]
-        else:
-            project_name = project_arg.rstrip("/")
-
-        try:
-            from pathlib import Path as _Path
-            import os
-            repo_root = _Path(os.environ.get("REPO_ROOT", Path(__file__).resolve().parent.parent.parent.parent))
-            project_root = repo_root / "projects" / project_name
-        except Exception:
-            return False, "project_root を特定できません。project_root を引数で渡してください。"
-    else:
-        project_name = project_root.name
+        project_root = workspace.project_dir(project_name)
 
     if not project_root.is_dir():
         return False, f"プロジェクトフォルダが存在しません: {project_root}"
@@ -208,7 +155,6 @@ def run(
     token = get_token(config)
     cache_path = project_root / "slack_list_entries_cache.json"
 
-    # --- (1) List の最新取得 ---
     list_entries: list[tuple[str, bool, str | None]] = []
 
     if token and list_id:
@@ -217,6 +163,7 @@ def run(
             return False, err
         try:
             from slack_sdk import WebClient
+
             client = WebClient(token=token)
             raw = slack_lists.list_entries(client, list_id)
             list_entries = raw
@@ -242,7 +189,6 @@ def run(
     todo_text = todo_path.read_text(encoding="utf-8")
     tasks = _parser.parse_todo_tasks(todo_text)
 
-    # --- check_only モード ---
     if check_only:
         list_norms = {_parser.normalize_task_text(body) for body, _, _ in list_entries}
         list_completed = {
@@ -253,10 +199,15 @@ def run(
         todo_norms = {norm for _, _, norm, _, _ in tasks}
         todo_completed = {norm for _, completed, norm, _, _ in tasks if completed}
 
-        only_in_todo = [norm for _, completed, norm, _, _ in tasks if norm not in list_norms and not completed]
-        only_in_list = [body for body, _, _ in list_entries if _parser.normalize_task_text(body) not in todo_norms]
+        only_in_todo = [
+            norm for _, completed, norm, _, _ in tasks if norm not in list_norms and not completed
+        ]
+        only_in_list = [
+            body for body, _, _ in list_entries if _parser.normalize_task_text(body) not in todo_norms
+        ]
         status_mismatch = [
-            norm for norm in list_norms & todo_norms
+            norm
+            for norm in list_norms & todo_norms
             if (norm in list_completed) != (norm in todo_completed)
         ]
 
@@ -283,7 +234,6 @@ def run(
                     )
         return True, "\n".join(lines)
 
-    # --- dry_run モード ---
     if dry_run:
         list_checked = {
             _parser.normalize_task_text(body)
@@ -293,12 +243,10 @@ def run(
         list_norms = {_parser.normalize_task_text(body) for body, _, _ in list_entries}
 
         would_complete = [
-            norm for _, todo_done, norm, _, _ in tasks
-            if not todo_done and norm in list_checked
+            norm for _, todo_done, norm, _, _ in tasks if not todo_done and norm in list_checked
         ]
         would_add = [
-            norm for _, todo_done, norm, _, _ in tasks
-            if not todo_done and norm not in list_norms
+            norm for _, todo_done, norm, _, _ in tasks if not todo_done and norm not in list_norms
         ]
 
         lines = [f"【dry-run】同期プレビュー: project={project_name}"]
@@ -313,7 +261,6 @@ def run(
         lines.append("\n（実際に実行するには --dry-run を外してください）")
         return True, "\n".join(lines)
 
-    # --- 通常同期モード ---
     if list_entries:
         apply_list_to_todo(todo_path, list_entries)
         messages.append("List の完了状態を todo.md に反映しました。")
