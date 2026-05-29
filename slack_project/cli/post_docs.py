@@ -10,7 +10,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        from slack_project.docs.formatter import run
+        from slack_project.docs.formatter import run  # type: ignore[attr-defined]
         result = run(minutes=args.minutes, dry_run=args.dry_run)
         print(result)
         return 0

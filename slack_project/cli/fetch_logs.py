@@ -11,7 +11,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         from slack_project.slack.fetch import fetch_weekly_logs
-        count = fetch_weekly_logs(project=args.project, from_date=args.from_date, safe_ratelimit=args.safe_ratelimit)
+        count = fetch_weekly_logs(project=args.project, from_date=args.from_date, safe_ratelimit=args.safe_ratelimit)  # type: ignore[call-arg]
         print(f"Fetched {count} logs")
         return 0
     except (ImportError, NotImplementedError, TypeError) as e:

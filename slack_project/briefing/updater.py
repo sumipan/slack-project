@@ -101,7 +101,7 @@ def update_canvas(project: str) -> tuple[bool, str]:
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json; charset=utf-8",
             },
-            json=payload,
+            json=payload,  # type: ignore[arg-type]
             timeout=30,
         )
         resp.raise_for_status()
