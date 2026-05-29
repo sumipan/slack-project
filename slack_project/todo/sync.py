@@ -106,6 +106,17 @@ def build_entries_for_list(
     return out
 
 
+def _resolve_slack_lists_module(slack_lists):
+    """slack_lists モジュールを返す。未指定時は tools.project.slack_lists を import する。"""
+    if slack_lists is not None:
+        return slack_lists, None
+    try:
+        from tools.project import slack_lists as _sl
+        return _sl, None
+    except ImportError:
+        return None, "slack_lists モジュールが見つかりません。slack_lists を引数で渡してください。"
+
+
 # ---------------------------------------------------------------------------
 # 公開 API
 # ---------------------------------------------------------------------------
@@ -140,27 +151,6 @@ def run(
     """
     messages: list[str] = []
 
-    # デフォルトの設定ローダーを解決
-    if load_config is None or get_token is None:
-        try:
-            from tools.project.config_loader import (
-                load_project_config as _load,
-                get_slack_token as _get_token,
-            )
-            if load_config is None:
-                load_config = _load
-            if get_token is None:
-                get_token = _get_token
-        except ImportError:
-            return False, "設定ローダーが見つかりません。load_config / get_token を引数で渡してください。"
-
-    if slack_lists is None:
-        try:
-            from tools.project import slack_lists as _sl
-            slack_lists = _sl
-        except ImportError:
-            return False, "slack_lists モジュールが見つかりません。slack_lists を引数で渡してください。"
-
     # プロジェクトパス解決
     if project_root is None:
         project_arg = (project or "").strip().replace("\\", "/")
@@ -187,6 +177,19 @@ def run(
     if not todo_path.exists():
         return False, f"todo.md が存在しません: {todo_path}"
 
+    if load_config is None or get_token is None:
+        try:
+            from tools.project.config_loader import (
+                load_project_config as _load,
+                get_slack_token as _get_token,
+            )
+            if load_config is None:
+                load_config = _load
+            if get_token is None:
+                get_token = _get_token
+        except ImportError:
+            return False, "設定ローダーが見つかりません。load_config / get_token を引数で渡してください。"
+
     try:
         config = load_config(project_root)
     except Exception as e:
@@ -201,6 +204,9 @@ def run(
     list_entries: list[tuple[str, bool, str | None]] = []
 
     if token and list_id:
+        slack_lists, err = _resolve_slack_lists_module(slack_lists)
+        if err:
+            return False, err
         try:
             from slack_sdk import WebClient
             client = WebClient(token=token)
@@ -335,6 +341,10 @@ def run(
         members_map = raw_members
     else:
         members_map = {}
+
+    slack_lists, err = _resolve_slack_lists_module(slack_lists)
+    if err:
+        return False, err
 
     status_cid, assignee_cid, due_cid, primary_cid = slack_lists.get_column_ids(
         client, list_id, config
