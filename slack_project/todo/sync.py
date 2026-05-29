@@ -133,7 +133,7 @@ def run(
         project_root: プロジェクトルートパス（省略時は config から解決）
         load_config: 設定ローダー関数（省略時は slack_project.config を使用）
         get_token: トークン取得関数（省略時は slack_project.config を使用）
-        slack_lists: slack_lists モジュール（省略時は tools.project.slack_lists を参照）
+        slack_lists: slack_lists モジュール（省略時は slack_project.slack.lists を参照）
 
     Returns:
         (success: bool, message: str)
@@ -143,7 +143,7 @@ def run(
     # デフォルトの設定ローダーを解決
     if load_config is None or get_token is None:
         try:
-            from tools.project.config_loader import (
+            from slack_project.config_loader import (
                 load_project_config as _load,
                 get_slack_token as _get_token,
             )
@@ -156,7 +156,7 @@ def run(
 
     if slack_lists is None:
         try:
-            from tools.project import slack_lists as _sl
+            from slack_project.slack import lists as _sl
             slack_lists = _sl
         except ImportError:
             return False, "slack_lists モジュールが見つかりません。slack_lists を引数で渡してください。"
