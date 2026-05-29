@@ -97,10 +97,7 @@ class TestSubmitOrder:
 
     def test_real_pipeline_state_writes_files(self, tmp_path):
         """PipelineState を実際に使い、ファイルが生成されることを検証する。"""
-        state_dir = tmp_path / ".state"
-
-        with patch("slack_project.ghdag_bridge._STATE_DIR", state_dir):
-            result = submit_order("order content here", queue_dir=tmp_path)
+        result = submit_order("order content here", queue_dir=tmp_path)
 
         order_files = list(tmp_path.glob("*-claude-order-*.md"))
         assert len(order_files) == 1
