@@ -17,7 +17,7 @@ from slack_project.todo import parser as _parser
 # ---------------------------------------------------------------------------
 
 
-def parse_list_entries_from_cache(cache_path: Path) -> list[tuple[str, bool, str]]:
+def parse_list_entries_from_cache(cache_path: Path) -> list[tuple[str, bool, str | None]]:
     """JSON キャッシュからエントリを復元。"""
     if not cache_path.exists():
         return []
@@ -104,6 +104,17 @@ def build_entries_for_list(
         seen.add(norm)
         out.append((norm, completed, None))
     return out
+
+
+def _resolve_slack_lists_module(slack_lists):
+    """slack_lists モジュールを返す。未指定時は tools.project.slack_lists を import する。"""
+    if slack_lists is not None:
+        return slack_lists, None
+    try:
+        from tools.project import slack_lists as _sl
+        return _sl, None
+    except ImportError:
+        return None, "slack_lists モジュールが見つかりません。slack_lists を引数で渡してください。"
 
 
 # ---------------------------------------------------------------------------
@@ -201,6 +212,9 @@ def run(
     list_entries: list[tuple[str, bool, str | None]] = []
 
     if token and list_id:
+        slack_lists, err = _resolve_slack_lists_module(slack_lists)
+        if err:
+            return False, err
         try:
             from slack_sdk import WebClient
             client = WebClient(token=token)
@@ -335,6 +349,10 @@ def run(
         members_map = raw_members
     else:
         members_map = {}
+
+    slack_lists, err = _resolve_slack_lists_module(slack_lists)
+    if err:
+        return False, err
 
     status_cid, assignee_cid, due_cid, primary_cid = slack_lists.get_column_ids(
         client, list_id, config

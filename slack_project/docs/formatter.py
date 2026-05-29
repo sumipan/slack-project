@@ -12,7 +12,7 @@ def format_head_blocks(
 ) -> list[dict]:
     """チャンネル冒頭投稿用の Block Kit JSON（section + context）を返す。"""
     overview_trim = overview[:400] + ("…" if len(overview) > 400 else "")
-    blocks = [
+    blocks: list[dict] = [
         {
             "type": "section",
             "text": {
