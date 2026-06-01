@@ -10,8 +10,6 @@ from ghdag.pipeline.state import PipelineState
 from ghdag.workflow.engine import get_adapter
 
 _TZ = ZoneInfo("Asia/Tokyo")
-_REPO_ROOT = Path(__file__).resolve().parent.parent
-_STATE_DIR = _REPO_ROOT / ".pipeline-state"
 
 _claude_adapter = get_adapter("claude")
 
@@ -20,19 +18,17 @@ def submit_order(
     order_content: str,
     *,
     model: str = "claude-sonnet-4-6",
-    queue_dir: Path | None = None,
+    queue_dir: Path,
 ) -> str:
     """order ファイルを書き出し exec.jsonl に追記する。
 
     order_content: order ファイルの内容
     model: Claude モデル名
-    queue_dir: jobs ディレクトリ（デフォルト: リポジトリルート/jobs/）
+    queue_dir: jobs ディレクトリ（必須）
     Returns: 結果ファイル名 "{ts}-claude-result-{uuid}.md"
     """
-    if queue_dir is None:
-        queue_dir = _REPO_ROOT / "jobs"
-
     exec_jsonl = queue_dir / "exec.jsonl"
+    state_dir = queue_dir.parent / ".pipeline-state"
 
     ts = datetime.now(_TZ).strftime("%Y%m%d%H%M%S")
     order_uuid = str(uuid.uuid4())
@@ -49,7 +45,7 @@ def submit_order(
     )
 
     queue_dir.mkdir(parents=True, exist_ok=True)
-    state = PipelineState(str(_STATE_DIR), str(exec_jsonl))
+    state = PipelineState(str(state_dir), str(exec_jsonl))
     state.write_order_file(
         ts=ts,
         order_uuid=order_uuid,

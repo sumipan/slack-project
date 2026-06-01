@@ -1,5 +1,6 @@
 import argparse
 import sys
+from pathlib import Path
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -12,13 +13,25 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         from slack_project.todo.sync import run
-        success, message = run(project=args.project, fetch_only=args.fetch_only, check_only=args.check_only, dry_run=args.dry_run)
+        from slack_project.workspace import ProjectWorkspace
+
+        repo_root = Path.cwd()
+        workspace = ProjectWorkspace(
+            projects_root=repo_root / "projects",
+            queue_dir=repo_root / "jobs",
+        )
+        success, message = run(
+            workspace,
+            args.project,
+            fetch_only=args.fetch_only,
+            check_only=args.check_only,
+            dry_run=args.dry_run,
+        )
         if success:
             print(message)
             return 0
-        else:
-            print(f"Error: {message}", file=sys.stderr)
-            return 1
+        print(f"Error: {message}", file=sys.stderr)
+        return 1
     except (ImportError, NotImplementedError) as e:
         print(f"Not implemented: {e}", file=sys.stderr)
         return 1

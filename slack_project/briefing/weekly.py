@@ -8,36 +8,11 @@ from zoneinfo import ZoneInfo
 
 import requests
 
+from slack_project.config_loader import load_project_config
+from slack_project.workspace import ProjectWorkspace, normalize_project_name
+
 _JST = ZoneInfo("Asia/Tokyo")
 _SLACK_API_BASE = "https://slack.com/api/"
-
-
-def _load_project_config(project: str) -> dict[str, Any]:
-    try:
-        import yaml
-    except ImportError:
-        return {}
-
-    config: dict[str, Any] = {}
-    for name in ("config.yaml", "config_local.yml", "config.local.yaml"):
-        p = Path("projects") / project / name
-        if p.exists():
-            with open(p, encoding="utf-8") as f:
-                data = yaml.safe_load(f) or {}
-                config = _deep_merge(config, data)
-    return config
-
-
-def _deep_merge(base: dict, override: dict) -> dict:
-    result = dict(base)
-    for key, value in override.items():
-        if value is None:
-            continue
-        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-            result[key] = _deep_merge(result[key], value)
-        else:
-            result[key] = value
-    return result
 
 
 def _get_slack_token(config: dict[str, Any]) -> str | None:
@@ -54,13 +29,13 @@ def _get_slack_channel_id(config: dict[str, Any]) -> str | None:
     )
 
 
-def _discover_projects() -> list[dict]:
+def _discover_projects(workspace: ProjectWorkspace) -> list[dict]:
     try:
         import yaml
     except ImportError:
         return []
 
-    projects_dir = Path("projects")
+    projects_dir = workspace.projects_root
     if not projects_dir.is_dir():
         return []
 
@@ -92,7 +67,6 @@ def _calc_period(
     since: str | None,
     until: str | None,
 ) -> tuple[datetime, datetime]:
-    """期間の開始・終了 datetime（JST aware）を計算して返す。"""
     if since and until:
         period_start = datetime.strptime(since, "%Y-%m-%d").replace(
             hour=0, minute=0, second=0, tzinfo=_JST
@@ -111,7 +85,7 @@ def _calc_period(
     if week == "current":
         period_start = this_saturday
         period_end = (this_saturday + timedelta(days=6)).replace(hour=23, minute=59, second=59)
-    else:  # "last"
+    else:
         last_saturday = this_saturday - timedelta(weeks=1)
         last_friday = last_saturday + timedelta(days=6)
         period_start = last_saturday
@@ -215,22 +189,16 @@ def _format_message(ts: float, user_id: str, text: str, indent: str = "") -> str
 
 
 def fetch_slack_log(
+    workspace: ProjectWorkspace,
     project: str,
     *,
     week: str = "last",
     since: str | None = None,
     until: str | None = None,
 ) -> tuple[bool, str]:
-    """Slack チャンネルログを取得し projects/<project>/assets/ に保存する。
-
-    week: "last" | "current"（since/until 指定時は無視）
-    返り値: (成功フラグ, "取得件数: N件" or エラーメッセージ)
-    """
     try:
-        if project.startswith("projects/"):
-            project = project[len("projects/"):]
-
-        config = _load_project_config(project)
+        project_name = normalize_project_name(project)
+        config = load_project_config(workspace.project_dir(project_name))
         token = _get_slack_token(config)
         channel_id = _get_slack_channel_id(config)
 
@@ -305,7 +273,7 @@ def fetch_slack_log(
 
         content = "\n".join(lines) + "\n" if lines else ""
 
-        assets_dir = Path("projects") / project / "assets"
+        assets_dir = workspace.project_dir(project_name) / "assets"
         assets_dir.mkdir(parents=True, exist_ok=True)
         start_str = period_start.strftime("%Y%m%d")
         end_str = period_end.strftime("%Y%m%d")
@@ -318,17 +286,13 @@ def fetch_slack_log(
 
 
 def run_auto_update(
+    workspace: ProjectWorkspace,
     *,
     safe_ratelimit: bool = False,
     dry_run: bool = False,
     week: str = "current",
 ) -> tuple[bool, str]:
-    """有効な全プロジェクトのログを一括取得する。
-
-    safe_ratelimit: API 呼び出し間に sleep を挿入
-    dry_run: 対象プロジェクト一覧のみ表示
-    """
-    projects = _discover_projects()
+    projects = _discover_projects(workspace)
     lines: list[str] = []
 
     if not projects:
@@ -347,7 +311,7 @@ def run_auto_update(
 
     for i, p in enumerate(projects):
         name = p["name"]
-        ok, out = fetch_slack_log(name, week=week)
+        ok, out = fetch_slack_log(workspace, name, week=week)
         prefix = f"[{i + 1}/{len(projects)}] {name}"
         if ok:
             succeeded.append(name)
@@ -371,15 +335,13 @@ def run_auto_update(
 
 
 def post_summary(
+    workspace: ProjectWorkspace,
     project: str,
     summary_file: str | Path,
     *,
     dry_run: bool = False,
 ) -> tuple[bool, str]:
-    """生成済みサマリーを Slack チャンネルに投稿する。"""
-    if project.startswith("projects/"):
-        project = project[len("projects/"):]
-
+    project_name = normalize_project_name(project)
     summary_path = Path(summary_file)
     if not summary_path.exists():
         return False, f"サマリーファイルが見つかりません: {summary_path}"
@@ -387,9 +349,9 @@ def post_summary(
     content = summary_path.read_text(encoding="utf-8")
 
     if dry_run:
-        return True, f"[dry-run] {project} へ投稿予定:\n{content}"
+        return True, f"[dry-run] {project_name} へ投稿予定:\n{content}"
 
-    config = _load_project_config(project)
+    config = load_project_config(workspace.project_dir(project_name))
     token = _get_slack_token(config)
     channel_id = _get_slack_channel_id(config)
 
@@ -412,6 +374,6 @@ def post_summary(
         data = resp.json()
         if not data.get("ok"):
             return False, f"Slack API エラー: {data.get('error', 'unknown')}"
-        return True, f"サマリーを投稿しました: {project}"
+        return True, f"サマリーを投稿しました: {project_name}"
     except Exception as exc:
         return False, str(exc)
