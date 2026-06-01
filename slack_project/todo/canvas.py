@@ -92,7 +92,7 @@ def push_to_canvas(
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json; charset=utf-8",
             },
-            json=payload,
+            json=payload,  # type: ignore[arg-type]
             timeout=30,
         )
         response.raise_for_status()
