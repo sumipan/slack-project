@@ -4,6 +4,7 @@ from pathlib import Path
 
 from slack_project.config_loader import get_slack_token, load_project_config
 from slack_project.slack.client import SlackClient
+from slack_project.todo.canvas import build_canvas_markdown
 from slack_project.workspace import ProjectWorkspace
 
 
@@ -47,7 +48,8 @@ def main(argv: list[str] | None = None) -> int:
             print("Error: Slack チャンネル ID または Canvas ID が設定されていません", file=sys.stderr)
             return 1
 
-        markdown = todo_path.read_text(encoding="utf-8")
+        raw_text = todo_path.read_text(encoding="utf-8")
+        markdown = build_canvas_markdown(raw_text)
         client = SlackClient(token, dry_run=args.dry_run)
         client.update_canvas(channel_id=channel_id, canvas_id=canvas_id, markdown=markdown)
         if args.dry_run:
