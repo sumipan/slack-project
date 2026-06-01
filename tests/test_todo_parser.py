@@ -2,6 +2,7 @@ from datetime import datetime
 
 
 from slack_project.todo.parser import (
+    get_completed_sections,
     normalize_task_text,
     parse_assignee,
     parse_due_date,
@@ -21,12 +22,14 @@ def test_parse_todo_tasks_basic():
     text = "## 議事録由来タスク\n- [ ] タスクA\n- [x] タスクB\n"
     result = parse_todo_tasks(text)
     assert len(result) == 2
-    _, done_a, norm_a, _, _ = result[0]
-    _, done_b, norm_b, _, _ = result[1]
+    _, done_a, norm_a, _, _, section_a = result[0]
+    _, done_b, norm_b, _, _, section_b = result[1]
     assert done_a is False
     assert done_b is True
     assert norm_a == "タスクA"
     assert norm_b == "タスクB"
+    assert section_a is None
+    assert section_b is None
 
 
 def test_parse_todo_tasks_empty():
@@ -61,6 +64,66 @@ def test_parse_todo_tasks_returns_raw_line():
     text = "## 議事録由来タスク\n- [ ] タスクA\n"
     result = parse_todo_tasks(text)
     assert result[0][0] == "- [ ] タスクA"
+
+
+def test_parse_todo_tasks_with_subsections():
+    text = (
+        "## 議事録由来タスク\n"
+        "### 2026-05-15 定例\n"
+        "- [ ] タスクA\n"
+        "### 2026-05-22 定例\n"
+        "- [x] タスクB\n"
+    )
+    result = parse_todo_tasks(text)
+    assert len(result) == 2
+    assert result[0][5] == "2026-05-15 定例"
+    assert result[1][5] == "2026-05-22 定例"
+
+
+def test_parse_todo_tasks_ignores_source_comment():
+    text = (
+        "## 議事録由来タスク\n"
+        "### 2026-05-15 定例\n"
+        "<!-- 出典: foo -->\n"
+        "- [ ] タスクA\n"
+    )
+    result = parse_todo_tasks(text)
+    assert len(result) == 1
+    assert result[0][2] == "タスクA"
+    assert result[0][5] == "2026-05-15 定例"
+
+
+# ---------------------------------------------------------------------------
+# get_completed_sections
+# ---------------------------------------------------------------------------
+
+
+def test_get_completed_sections_returns_only_fully_completed_sections():
+    text = (
+        "## 議事録由来タスク\n"
+        "### A\n"
+        "- [x] A1\n"
+        "- [x] A2\n"
+        "### B\n"
+        "- [ ] B1\n"
+        "- [x] B2\n"
+    )
+    assert get_completed_sections(text) == ["A"]
+
+
+def test_get_completed_sections_empty_section_is_not_completed():
+    text = "## 議事録由来タスク\n### A\n<!-- 出典: foo -->\n"
+    assert get_completed_sections(text) == []
+
+
+def test_get_completed_sections_ignores_tasks_without_section():
+    text = (
+        "## 議事録由来タスク\n"
+        "- [x] セクション外\n"
+        "### A\n"
+        "- [ ] A1\n"
+    )
+    assert get_completed_sections(text) == []
 
 
 # ---------------------------------------------------------------------------
