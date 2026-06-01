@@ -78,20 +78,27 @@ def resolve_assignee_to_slack_id(name: str, members: dict[str, str]) -> str | No
     return None
 
 
-def parse_todo_tasks(todo_text: str) -> list[tuple[str, bool, str, str | None, str | None]]:
+def parse_todo_tasks(todo_text: str) -> list[tuple[str, bool, str, str | None, str | None, str | None]]:
     """todo.md の '議事録由来タスク' セクションをパースし、
-    [(raw_line, completed, normalized_text, assignee_name, due_iso)] を返す。"""
+    [(raw_line, completed, normalized_text, assignee_name, due_iso, section_key)] を返す。
+    section_key は `###` 見出しのタイトル。見出し外は None。"""
     if not todo_text:
         return []
     in_section = False
-    result: list[tuple[str, bool, str, str | None, str | None]] = []
+    current_section_key: str | None = None
+    result: list[tuple[str, bool, str, str | None, str | None, str | None]] = []
     for line in todo_text.split("\n"):
         if line.strip().startswith("## ") and "議事録由来タスク" in line:
             in_section = True
+            current_section_key = None
             continue
         if in_section and line.strip().startswith("## "):
             break
         if not in_section:
+            continue
+        if line.strip().startswith("### "):
+            key = line.strip()[4:].strip()
+            current_section_key = key or None
             continue
         m = RE_TASK_LINE.match(line)
         if m:
@@ -100,5 +107,20 @@ def parse_todo_tasks(todo_text: str) -> list[tuple[str, bool, str, str | None, s
             normalized = normalize_task_text(body)
             assignee = parse_assignee(body)
             due_iso = parse_due_date(body)
-            result.append((line.strip(), completed, normalized, assignee, due_iso))
+            result.append((line.strip(), completed, normalized, assignee, due_iso, current_section_key))
     return result
+
+
+def get_completed_sections(todo_text: str) -> list[str]:
+    """全タスクが完了したセクションキーを返す。タスク 0 件のセクションは除外。"""
+    section_status: dict[str, list[bool]] = {}
+    for _raw, completed, _norm, _assignee, _due, section_key in parse_todo_tasks(todo_text):
+        if section_key is None:
+            continue
+        section_status.setdefault(section_key, []).append(completed)
+
+    completed_sections: list[str] = []
+    for section_key, statuses in section_status.items():
+        if statuses and all(statuses):
+            completed_sections.append(section_key)
+    return completed_sections

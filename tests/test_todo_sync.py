@@ -55,7 +55,7 @@ def test_parse_cache_multiple_entries(tmp_path):
 
 
 def _make_task(norm, completed=False):
-    return (f"- [ ] {norm}", completed, norm, None, None)
+    return (f"- [ ] {norm}", completed, norm, None, None, None)
 
 
 def test_build_entries_new_task():

@@ -90,13 +90,13 @@ def build_entries_for_list(
     """todo.md タスクと既存エントリをマージ。完了済み [x] の新規追加は除外。"""
     seen: set[str] = set()
     out: list[tuple[str, bool, str | None]] = []
-    todo_by_norm = {norm: completed for (_, completed, norm, _, _) in todo_tasks}
+    todo_by_norm = {norm: completed for (_, completed, norm, _, _, _) in todo_tasks}
     for body, completed, entry_id in existing_entries:
         norm = _parser.normalize_task_text(body)
         seen.add(norm)
         completed = todo_by_norm.get(norm, completed)
         out.append((body, completed, entry_id))
-    for raw_line, completed, norm, _assignee, _due in todo_tasks:
+    for raw_line, completed, norm, _assignee, _due, _section_key in todo_tasks:
         if norm in seen:
             continue
         if completed:
@@ -250,10 +250,10 @@ def run(
             for body, completed, _ in list_entries
             if completed
         }
-        todo_norms = {norm for _, _, norm, _, _ in tasks}
-        todo_completed = {norm for _, completed, norm, _, _ in tasks if completed}
+        todo_norms = {norm for _, _, norm, _, _, _ in tasks}
+        todo_completed = {norm for _, completed, norm, _, _, _ in tasks if completed}
 
-        only_in_todo = [norm for _, completed, norm, _, _ in tasks if norm not in list_norms and not completed]
+        only_in_todo = [norm for _, completed, norm, _, _, _ in tasks if norm not in list_norms and not completed]
         only_in_list = [body for body, _, _ in list_entries if _parser.normalize_task_text(body) not in todo_norms]
         status_mismatch = [
             norm for norm in list_norms & todo_norms
@@ -293,11 +293,11 @@ def run(
         list_norms = {_parser.normalize_task_text(body) for body, _, _ in list_entries}
 
         would_complete = [
-            norm for _, todo_done, norm, _, _ in tasks
+            norm for _, todo_done, norm, _, _, _ in tasks
             if not todo_done and norm in list_checked
         ]
         would_add = [
-            norm for _, todo_done, norm, _, _ in tasks
+            norm for _, todo_done, norm, _, _, _ in tasks
             if not todo_done and norm not in list_norms
         ]
 
@@ -358,7 +358,7 @@ def run(
         client, list_id, config
     )
 
-    norm_to_assignee_due = {norm: (assignee, due_iso) for (_, _, norm, assignee, due_iso) in tasks}
+    norm_to_assignee_due = {norm: (assignee, due_iso) for (_, _, norm, assignee, due_iso, _) in tasks}
 
     merged = build_entries_for_list(tasks, list_entries)
     added = 0
