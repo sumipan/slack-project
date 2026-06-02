@@ -78,11 +78,10 @@ def push_to_canvas(
             "changes": [
                 {
                     "operation": "replace",
-                    "document_range": {
-                        "anchor_block": {"id": "start"},
-                        "end_block": {"id": "end"},
+                    "document_content": {
+                        "type": "markdown",
+                        "markdown": markdown,
                     },
-                    "elements": [{"type": "markdown", "text": markdown}],
                 }
             ],
         }

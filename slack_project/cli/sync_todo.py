@@ -7,12 +7,14 @@ from slack_project.slack.client import SlackClient
 from slack_project.workspace import ProjectWorkspace
 
 
-def _get_canvas_ids(config: dict) -> tuple[str | None, str | None]:
+def _get_canvas_id(config: dict) -> str | None:
     slack = config.get("slack") or {}
     project = config.get("project") or {}
-    channel_id = slack.get("channel_id") or project.get("slack_channel_id")
-    canvas_id = slack.get("canvas_id") or project.get("slack_canvas_id")
-    return channel_id, canvas_id
+    return (
+        slack.get("todo_canvas_id")
+        or slack.get("canvas_id")
+        or project.get("slack_canvas_id")
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -39,17 +41,17 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_project_config(project_dir)
         token = get_slack_token(config)
-        channel_id, canvas_id = _get_canvas_ids(config)
+        canvas_id = _get_canvas_id(config)
         if not token:
             print("Error: Slack トークンが設定されていません", file=sys.stderr)
             return 1
-        if not channel_id or not canvas_id:
-            print("Error: Slack チャンネル ID または Canvas ID が設定されていません", file=sys.stderr)
+        if not canvas_id:
+            print("Error: Canvas ID が設定されていません（slack.todo_canvas_id を config に追加してください）", file=sys.stderr)
             return 1
 
         markdown = todo_path.read_text(encoding="utf-8")
         client = SlackClient(token, dry_run=args.dry_run)
-        client.update_canvas(channel_id=channel_id, canvas_id=canvas_id, markdown=markdown)
+        client.update_canvas(canvas_id=canvas_id, markdown=markdown)
         if args.dry_run:
             print(f"Canvas dry-run push completed: {args.project}")
         else:
