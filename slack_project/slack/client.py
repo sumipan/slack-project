@@ -99,8 +99,7 @@ class SlackClient:
             "changes": [
                 {
                     "operation": "replace",
-                    "document_range": {"anchor_block": {"id": "start"}, "end_block": {"id": "end"}},
-                    "elements": [{"type": "markdown", "text": markdown}],
+                    "document_content": {"type": "markdown", "markdown": markdown},
                 }
             ],
         }
