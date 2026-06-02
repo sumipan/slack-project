@@ -64,17 +64,17 @@ def _setup_project(tmp_path, todo_text: str) -> None:
     )
 
 
-def _run_canvas_push(tmp_path, monkeypatch, *, dry_run: bool = False) -> list[tuple[str, str, str]]:
+def _run_canvas_push(tmp_path, monkeypatch, *, dry_run: bool = False) -> list[tuple[str, str]]:
     monkeypatch.chdir(tmp_path)
-    calls: list[tuple[str, str, str]] = []
+    calls: list[tuple[str, str]] = []
 
     class FakeSlackClient:
         def __init__(self, token: str, *, dry_run: bool = False) -> None:
             self.token = token
             self.dry_run = dry_run
 
-        def update_canvas(self, channel_id: str, canvas_id: str, markdown: str):
-            calls.append((channel_id, canvas_id, markdown))
+        def update_canvas(self, canvas_id: str, markdown: str):
+            calls.append((canvas_id, markdown))
             return {"ok": True}
 
     monkeypatch.setattr("slack_project.cli.sync_todo.SlackClient", FakeSlackClient)
@@ -89,7 +89,7 @@ def _run_canvas_push(tmp_path, monkeypatch, *, dry_run: bool = False) -> list[tu
 def test_canvas_push_success(tmp_path, monkeypatch):
     _setup_project(tmp_path, "## 議事録由来タスク\n- [ ] A\n")
     calls = _run_canvas_push(tmp_path, monkeypatch)
-    assert calls and calls[0][0] == "C123" and calls[0][1] == "F456"
+    assert calls and calls[0][0] == "F456"
 
 
 def test_canvas_push_excludes_fully_completed_sections(tmp_path, monkeypatch):
@@ -104,7 +104,7 @@ def test_canvas_push_excludes_fully_completed_sections(tmp_path, monkeypatch):
     )
     _setup_project(tmp_path, todo_text)
     calls = _run_canvas_push(tmp_path, monkeypatch)
-    markdown = calls[0][2]
+    markdown = calls[0][1]
     assert "### 2026-05-15 定例" not in markdown
     assert "### 進行中" in markdown
     assert "- [ ] 進行中" in markdown
@@ -119,7 +119,7 @@ def test_canvas_push_keeps_partially_completed_sections(tmp_path, monkeypatch):
     )
     _setup_project(tmp_path, todo_text)
     calls = _run_canvas_push(tmp_path, monkeypatch)
-    markdown = calls[0][2]
+    markdown = calls[0][1]
     assert "### A" in markdown
     assert "- [ ] todo" in markdown
 
@@ -127,7 +127,7 @@ def test_canvas_push_keeps_partially_completed_sections(tmp_path, monkeypatch):
 def test_canvas_push_empty_todo_sends_header_only(tmp_path, monkeypatch):
     _setup_project(tmp_path, "## 議事録由来タスク\n")
     calls = _run_canvas_push(tmp_path, monkeypatch)
-    assert calls[0][2] == "## 議事録由来タスク\n"
+    assert calls[0][1] == "## 議事録由来タスク\n"
 
 
 def test_canvas_push_dry_run_excludes_completed_sections(tmp_path, monkeypatch, capsys):
@@ -140,7 +140,7 @@ def test_canvas_push_dry_run_excludes_completed_sections(tmp_path, monkeypatch, 
     )
     _setup_project(tmp_path, todo_text)
     calls = _run_canvas_push(tmp_path, monkeypatch, dry_run=True)
-    markdown = calls[0][2]
+    markdown = calls[0][1]
     assert "### 完了" not in markdown
     assert "### 進行中" in markdown
     captured = capsys.readouterr()

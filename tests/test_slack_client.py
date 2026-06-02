@@ -37,7 +37,7 @@ class TestSlackClientDryRun:
 
     def test_update_canvas_dry_run(self, capsys):
         client = SlackClient(token="xoxp-test", dry_run=True)
-        result = client.update_canvas(channel_id="C123", canvas_id="F456", markdown="# test")
+        result = client.update_canvas(canvas_id="F456", markdown="# test")
         assert result["ok"] is True
 
     def test_post_message_with_persona(self, capsys):
