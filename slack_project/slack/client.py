@@ -91,18 +91,15 @@ class SlackClient:
 
     def update_canvas(
         self,
-        channel_id: str,
         canvas_id: str,
         markdown: str,
     ) -> dict[str, Any]:
         payload = {
-            "channel_id": channel_id,
             "canvas_id": canvas_id,
             "changes": [
                 {
                     "operation": "replace",
-                    "document_range": {"anchor_block": {"id": "start"}, "end_block": {"id": "end"}},
-                    "elements": [{"type": "markdown", "text": markdown}],
+                    "document_content": {"type": "markdown", "markdown": markdown},
                 }
             ],
         }
