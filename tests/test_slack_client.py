@@ -40,31 +40,45 @@ class TestSlackClientDryRun:
         result = client.update_canvas(canvas_id="F456", markdown="# test")
         assert result["ok"] is True
 
-    def test_update_canvas_uses_lookup_and_insert_at_start_plus_delete(self):
-        """real path: canvases.sections.lookup → canvases.edit with insert_at_start + delete per old section"""
+    def test_update_canvas_lookup_then_delete_each_then_insert(self):
+        """real path: lookup → N delete calls (1 change each) → 1 insert_at_start call.
+
+        Slack の canvases.edit は changes 配列に 1 件しか入れられないので、
+        旧セクションごとに 1 call 投げる必要がある。
+        """
         client = SlackClient(token="xoxp-test")
         with patch.object(client, "_post") as mock_post:
-            # 1st call: sections.lookup returns 2 old sections
-            # 2nd call: canvases.edit returns ok
             mock_post.side_effect = [
                 {"ok": True, "sections": [{"id": "sec1"}, {"id": "sec2"}]},
-                {"ok": True},
+                {"ok": True},  # delete sec1
+                {"ok": True},  # delete sec2
+                {"ok": True},  # insert_at_start
             ]
             result = client.update_canvas(canvas_id="F456", markdown="## new")
             assert result == {"ok": True}
-            assert mock_post.call_count == 2
-            # First call: lookup
-            first_args = mock_post.call_args_list[0][0]
-            assert first_args[0] == "canvases.sections.lookup"
-            assert first_args[1]["criteria"]["section_types"] == ["any_header"]
-            # Second call: edit with batched changes
-            second_args = mock_post.call_args_list[1][0]
-            assert second_args[0] == "canvases.edit"
-            changes = second_args[1]["changes"]
-            assert changes[0]["operation"] == "insert_at_start"
-            assert changes[0]["document_content"] == {"type": "markdown", "markdown": "## new"}
-            assert {c["operation"] for c in changes[1:]} == {"delete"}
-            assert [c["section_id"] for c in changes[1:]] == ["sec1", "sec2"]
+            assert mock_post.call_count == 4
+            calls = mock_post.call_args_list
+            assert calls[0][0][0] == "canvases.sections.lookup"
+            assert calls[1][0] == (
+                "canvases.edit",
+                {"canvas_id": "F456", "changes": [{"operation": "delete", "section_id": "sec1"}]},
+            )
+            assert calls[2][0] == (
+                "canvases.edit",
+                {"canvas_id": "F456", "changes": [{"operation": "delete", "section_id": "sec2"}]},
+            )
+            assert calls[3][0] == (
+                "canvases.edit",
+                {
+                    "canvas_id": "F456",
+                    "changes": [
+                        {
+                            "operation": "insert_at_start",
+                            "document_content": {"type": "markdown", "markdown": "## new"},
+                        }
+                    ],
+                },
+            )
 
     def test_update_canvas_empty_lookup_still_inserts(self):
         """If the canvas has no existing header sections, only insert_at_start is emitted."""
@@ -72,9 +86,10 @@ class TestSlackClientDryRun:
         with patch.object(client, "_post") as mock_post:
             mock_post.side_effect = [{"ok": True, "sections": []}, {"ok": True}]
             client.update_canvas(canvas_id="F456", markdown="## fresh")
-            changes = mock_post.call_args_list[1][0][1]["changes"]
-            assert len(changes) == 1
-            assert changes[0]["operation"] == "insert_at_start"
+            assert mock_post.call_count == 2
+            second = mock_post.call_args_list[1][0]
+            assert second[0] == "canvases.edit"
+            assert second[1]["changes"][0]["operation"] == "insert_at_start"
 
     def test_access_canvas_markdown_returns_downloaded_text(self):
         """access_canvas_markdown → files.info → GET url_private_download with auth header"""
