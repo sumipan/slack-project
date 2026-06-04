@@ -94,16 +94,60 @@ class SlackClient:
         canvas_id: str,
         markdown: str,
     ) -> dict[str, Any]:
-        payload = {
-            "canvas_id": canvas_id,
-            "changes": [
-                {
-                    "operation": "replace",
-                    "document_content": {"type": "markdown", "markdown": markdown},
-                }
-            ],
-        }
-        return self._post("canvases.edit", payload)
+        """Canvas 全文を markdown で置換する。
+
+        Slack の `canvases.edit` API は section_id 必須の `replace` か、
+        section_id 不要の `insert_at_*` / `delete` しか提供しないため、
+        フル置換は「既存ヘッダーセクションを列挙 → insert_at_start で新コンテンツ
+        投入 → 旧セクションを順に delete」の 3 段 batch で実現する。
+        単一の `canvases.edit` 呼び出しに全 changes を渡す。
+        """
+        sections_resp = self._post(
+            "canvases.sections.lookup",
+            {"canvas_id": canvas_id, "criteria": {"section_types": ["any_header"]}},
+        )
+        old_section_ids = [s["id"] for s in sections_resp.get("sections", [])]
+
+        changes: list[dict[str, Any]] = [
+            {
+                "operation": "insert_at_start",
+                "document_content": {"type": "markdown", "markdown": markdown},
+            }
+        ]
+        for sid in old_section_ids:
+            changes.append({"operation": "delete", "section_id": sid})
+
+        return self._post(
+            "canvases.edit", {"canvas_id": canvas_id, "changes": changes}
+        )
+
+    def access_canvas_markdown(self, canvas_id: str) -> str:
+        """Canvas の全文 markdown を返す。
+
+        Slack の公開 API には canvas 専用の content-read エンドポイントが無いため、
+        canvas を file として `files.info` で参照し、`url_private_download` を
+        ダウンロードして本文を取得する。
+        Required scope: `files:read`（`canvases:read` だけでは不可）。
+
+        Raises:
+            RuntimeError: Slack API エラー、ダウンロード失敗時。
+        """
+        info = self.api_call("files.info", params={"file": canvas_id})
+        file_obj = info.get("file") or {}
+        download_url = (
+            file_obj.get("url_private_download") or file_obj.get("url_private")
+        )
+        if not download_url:
+            raise RuntimeError(
+                f"files.info に url_private_download が含まれていません: canvas_id={canvas_id}"
+            )
+        resp = requests.get(
+            download_url,
+            headers={"Authorization": f"Bearer {self.token}"},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.text
 
     def conversations_history(
         self,
