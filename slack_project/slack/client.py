@@ -96,11 +96,17 @@ class SlackClient:
     ) -> dict[str, Any]:
         """Canvas 全文を markdown で置換する。
 
-        Slack の `canvases.edit` API は section_id 必須の `replace` か、
-        section_id 不要の `insert_at_*` / `delete` しか提供しないため、
-        フル置換は「既存ヘッダーセクションを列挙 → insert_at_start で新コンテンツ
-        投入 → 旧セクションを順に delete」の 3 段 batch で実現する。
-        単一の `canvases.edit` 呼び出しに全 changes を渡す。
+        Slack の ``canvases.edit`` API は ``changes`` に 1 件しか受け付けない
+        (``no more than 1 items allowed``) ため、フル置換は複数 API call の
+        シーケンスで実現する:
+
+        1. ``canvases.sections.lookup`` で既存ヘッダーセクション ID を列挙
+        2. 旧セクションを 1 件ずつ ``delete``
+        3. ``insert_at_start`` で新 markdown を 1 件で投入
+
+        合計 N+2 リクエスト (N = 旧セクション数 + lookup + insert)。
+        Slack のレート制限は ``canvases.edit`` が Tier 3 (おおむね 50/min) なので
+        通常の todo Canvas (数十セクション) なら問題ない。
         """
         sections_resp = self._post(
             "canvases.sections.lookup",
@@ -108,17 +114,28 @@ class SlackClient:
         )
         old_section_ids = [s["id"] for s in sections_resp.get("sections", [])]
 
-        changes: list[dict[str, Any]] = [
-            {
-                "operation": "insert_at_start",
-                "document_content": {"type": "markdown", "markdown": markdown},
-            }
-        ]
+        # 旧セクションを delete してから新コンテンツを insert する。
+        # (順序を逆にすると insert で増えたセクションと既存 ID が混ざりうるので注意)
         for sid in old_section_ids:
-            changes.append({"operation": "delete", "section_id": sid})
+            self._post(
+                "canvases.edit",
+                {
+                    "canvas_id": canvas_id,
+                    "changes": [{"operation": "delete", "section_id": sid}],
+                },
+            )
 
         return self._post(
-            "canvases.edit", {"canvas_id": canvas_id, "changes": changes}
+            "canvases.edit",
+            {
+                "canvas_id": canvas_id,
+                "changes": [
+                    {
+                        "operation": "insert_at_start",
+                        "document_content": {"type": "markdown", "markdown": markdown},
+                    }
+                ],
+            },
         )
 
     def access_canvas_markdown(self, canvas_id: str) -> str:
