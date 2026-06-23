@@ -35,7 +35,8 @@ projects/
 # projects/myproject/config.yaml
 slack:
   user_token: "xoxp-..."
-  canvas_id: "F0123CANVAS"
+  briefing_canvas_id: "F0123BRIEFING"  # briefing.md → Canvas 一方向
+  todo_canvas_id: "F0123TODO"          # todo.md ↔ Canvas 双方向
   channel_id: "C0123CHANNEL"
 ```
 
@@ -236,10 +237,9 @@ slack_project/
 | `slack.user_token` | str | Slack ユーザートークン（Canvas API に必須） |
 | `slack.token` | str | `user_token` の代替キー |
 | `slack.channel_id` | str | 投稿先 Slack チャンネル ID |
-| `slack.canvas_id` | str | Todo 同期先 Canvas ID |
-| `slack.todo_canvas_id` | str | 完了タスク用 Canvas ID |
+| `slack.briefing_canvas_id` | str | ブリーフィング Canvas ID（briefing.md → Canvas 一方向） |
+| `slack.todo_canvas_id` | str | TODO Canvas ID（todo.md ↔ Canvas 双方向） |
 | `project.slack_channel_id` | str | `slack.channel_id` の代替キー |
-| `project.slack_canvas_id` | str | `slack.canvas_id` の代替キー |
 | `weekly_summary.enabled` | bool | 週次サマリー生成の有効化 |
 | `advisor_enabled` | bool | コンテキスト収集（briefing）の有効化 |
 | `slack_token` | str | トップレベルトークン（レガシー互換） |

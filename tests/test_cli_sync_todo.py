@@ -39,7 +39,7 @@ def test_dry_run_flag_success(tmp_path, monkeypatch, capsys):
     project_root.mkdir(parents=True)
     (project_root / "todo.md").write_text("## 議事録由来タスク\n- [ ] A\n", encoding="utf-8")
     (project_root / "config.yaml").write_text(
-        "slack:\n  user_token: xoxp-test\n  channel_id: C123\n  canvas_id: F456\n",
+        "slack:\n  user_token: xoxp-test\n  channel_id: C123\n  todo_canvas_id: F456\n",
         encoding="utf-8",
     )
     monkeypatch.chdir(tmp_path)
@@ -59,7 +59,7 @@ def _setup_project(tmp_path, todo_text: str) -> None:
     project_root.mkdir(parents=True)
     (project_root / "todo.md").write_text(todo_text, encoding="utf-8")
     (project_root / "config.yaml").write_text(
-        "slack:\n  user_token: xoxp-test\n  channel_id: C123\n  canvas_id: F456\n",
+        "slack:\n  user_token: xoxp-test\n  channel_id: C123\n  todo_canvas_id: F456\n",
         encoding="utf-8",
     )
 
@@ -90,6 +90,42 @@ def test_canvas_push_success(tmp_path, monkeypatch):
     _setup_project(tmp_path, "## 議事録由来タスク\n- [ ] A\n")
     calls = _run_canvas_push(tmp_path, monkeypatch)
     assert calls and calls[0][0] == "F456"
+
+
+def test_canvas_push_uses_todo_canvas_id(tmp_path, monkeypatch):
+    _setup_project(tmp_path, "## 議事録由来タスク\n- [ ] A\n")
+    calls = _run_canvas_push(tmp_path, monkeypatch)
+    assert calls and calls[0][0] == "F456"
+
+
+def test_old_canvas_id_key_not_used(tmp_path, monkeypatch, capsys):
+    project_root = tmp_path / "projects" / "my-project"
+    project_root.mkdir(parents=True)
+    (project_root / "todo.md").write_text("## 議事録由来タスク\n- [ ] A\n", encoding="utf-8")
+    (project_root / "config.yaml").write_text(
+        "slack:\n  user_token: xoxp-test\n  channel_id: C123\n  canvas_id: F_OLD\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    result = main(["--project", "my-project"])
+    assert result == 1
+    captured = capsys.readouterr()
+    assert "todo_canvas_id" in captured.err
+
+
+def test_missing_todo_canvas_id_returns_error_with_key_name(tmp_path, monkeypatch, capsys):
+    project_root = tmp_path / "projects" / "my-project"
+    project_root.mkdir(parents=True)
+    (project_root / "todo.md").write_text("## 議事録由来タスク\n- [ ] A\n", encoding="utf-8")
+    (project_root / "config.yaml").write_text(
+        "slack:\n  user_token: xoxp-test\n  channel_id: C123\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    result = main(["--project", "my-project"])
+    assert result == 1
+    captured = capsys.readouterr()
+    assert "slack.todo_canvas_id" in captured.err
 
 
 def test_canvas_push_excludes_fully_completed_sections(tmp_path, monkeypatch):

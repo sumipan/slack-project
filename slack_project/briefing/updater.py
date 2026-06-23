@@ -19,7 +19,7 @@ def _get_canvas_token(config: dict[str, Any]) -> str | None:
 def _get_canvas_ids(config: dict[str, Any]) -> tuple[str | None, str | None]:
     slack = config.get("slack") or {}
     channel_id = slack.get("channel_id") or (config.get("project") or {}).get("slack_channel_id")
-    canvas_id = slack.get("canvas_id") or (config.get("project") or {}).get("slack_canvas_id")
+    canvas_id = slack.get("briefing_canvas_id")
     return channel_id, canvas_id
 
 
@@ -35,8 +35,10 @@ def update_canvas(workspace: ProjectWorkspace, project: str) -> tuple[bool, str]
 
     if not token:
         return False, "Slack トークンが設定されていません"
-    if not channel_id or not canvas_id:
-        return False, "Slack チャンネル ID または Canvas ID が設定されていません"
+    if not channel_id:
+        return False, "Slack チャンネル ID が設定されていません"
+    if not canvas_id:
+        return False, "Error: slack.briefing_canvas_id が未設定です。config.yaml に追加してください。"
 
     markdown = briefing_path.read_text(encoding="utf-8")
 

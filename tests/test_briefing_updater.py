@@ -42,13 +42,13 @@ class TestUpdateCanvas:
         assert ok is False
         assert "briefing.md" in msg
 
-    def test_canvas_api_called(self, tmp_path):
+    def test_canvas_api_called_with_briefing_canvas_id(self, tmp_path):
         ws = _ws(tmp_path)
         proj_dir = ws.projects_root / "my-project"
         proj_dir.mkdir(parents=True)
         (proj_dir / "briefing.md").write_text("# Briefing\nContent here")
         (proj_dir / "config.yaml").write_text(
-            "slack:\n  user_token: xoxp-test\n  channel_id: C123\n  canvas_id: F456\n"
+            "slack:\n  user_token: xoxp-test\n  channel_id: C123\n  briefing_canvas_id: F456\n"
         )
 
         mock_resp = MagicMock()
@@ -66,12 +66,40 @@ class TestUpdateCanvas:
         assert payload["canvas_id"] == "F456"
         assert payload["channel_id"] == "C123"
 
+    def test_old_canvas_id_key_ignored(self, tmp_path):
+        ws = _ws(tmp_path)
+        proj_dir = ws.projects_root / "old-key-proj"
+        proj_dir.mkdir(parents=True)
+        (proj_dir / "briefing.md").write_text("content")
+        (proj_dir / "config.yaml").write_text(
+            "slack:\n  user_token: xoxp-test\n  channel_id: C123\n  canvas_id: F_OLD\n"
+        )
+
+        ok, msg = update_canvas(ws, "old-key-proj")
+        assert ok is False
+        assert "briefing_canvas_id" in msg
+
+    def test_missing_briefing_canvas_id_returns_error_with_key_name(self, tmp_path):
+        ws = _ws(tmp_path)
+        proj_dir = ws.projects_root / "no-canvas"
+        proj_dir.mkdir(parents=True)
+        (proj_dir / "briefing.md").write_text("content")
+        (proj_dir / "config.yaml").write_text(
+            "slack:\n  user_token: xoxp-test\n  channel_id: C123\n"
+        )
+
+        ok, msg = update_canvas(ws, "no-canvas")
+        assert ok is False
+        assert "slack.briefing_canvas_id" in msg
+
     def test_missing_token_returns_error(self, tmp_path):
         ws = _ws(tmp_path)
         proj_dir = ws.projects_root / "no-token"
         proj_dir.mkdir(parents=True)
         (proj_dir / "briefing.md").write_text("content")
-        (proj_dir / "config.yaml").write_text("slack:\n  channel_id: C123\n  canvas_id: F456\n")
+        (proj_dir / "config.yaml").write_text(
+            "slack:\n  channel_id: C123\n  briefing_canvas_id: F456\n"
+        )
 
         ok, msg = update_canvas(ws, "no-token")
         assert ok is False
@@ -83,7 +111,7 @@ class TestUpdateCanvas:
         proj_dir.mkdir(parents=True)
         (proj_dir / "briefing.md").write_text("content")
         (proj_dir / "config.yaml").write_text(
-            "slack:\n  user_token: xoxp-test\n  channel_id: C123\n  canvas_id: F456\n"
+            "slack:\n  user_token: xoxp-test\n  channel_id: C123\n  briefing_canvas_id: F456\n"
         )
 
         mock_resp = MagicMock()

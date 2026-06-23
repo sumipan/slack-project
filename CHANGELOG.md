@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### BREAKING CHANGES
+
+- **`slack.canvas_id` キーを廃止し、用途別キーに分離** ([#2272](https://github.com/sumipan/nexus/issues/2272))
+  - `slack.briefing_canvas_id` — ブリーフィング Canvas（briefing.md → Canvas 一方向）
+  - `slack.todo_canvas_id` — TODO Canvas（todo.md ↔ Canvas 双方向）
+  - `project.slack_canvas_id` fallback も完全削除
+  - マイグレーション: `python3 -m slack_project.cli.migrate_canvas_keys --projects-dir <dir>` を実行すること
+- **`briefing/updater.py`**: 未設定時エラーメッセージが `slack.briefing_canvas_id` キー名を案内するよう変更
+- **`cli/sync_todo.py`**: 未設定時エラーメッセージが `slack.todo_canvas_id` キー名を案内するよう変更
+
+### Added
+
+- `slack_project.cli.migrate_canvas_keys` — プロジェクト config の Canvas キーリネーム CLI (`--projects-dir`, `--dry-run`)
+
 ## [0.1.4] - 2026-05-29
 
 - ci: add `.github/workflows/test.yml` (pytest, ruff, mypy on push/PR)
