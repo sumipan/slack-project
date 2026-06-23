@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "slack-project"
 version = "0.2.1"
 requires-python = ">=3.11"
-dependencies = ["ghdag>=0.25.0", "requests"]
+dependencies = ["ghdag>=0.25.0", "requests", "ruamel.yaml"]
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff", "mypy"]

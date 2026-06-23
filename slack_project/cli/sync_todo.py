@@ -10,8 +10,7 @@ from slack_project.workspace import ProjectWorkspace
 
 def _get_canvas_id(config: dict) -> str | None:
     slack = config.get("slack") or {}
-    project = config.get("project") or {}
-    return slack.get("canvas_id") or project.get("slack_canvas_id")
+    return slack.get("todo_canvas_id")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -43,7 +42,7 @@ def main(argv: list[str] | None = None) -> int:
             print("Error: Slack トークンが設定されていません", file=sys.stderr)
             return 1
         if not canvas_id:
-            print("Error: Canvas ID が設定されていません", file=sys.stderr)
+            print("Error: slack.todo_canvas_id が未設定です。config.yaml に追加してください。", file=sys.stderr)
             return 1
 
         raw_text = todo_path.read_text(encoding="utf-8")
