@@ -15,9 +15,9 @@ class ProjectWorkspace(Protocol):
 
 
 def build_canvas_markdown(todo_text: str) -> str:
-    """`##` セクションごとに、未完了タスクを含む `###` セクションだけを抽出した Markdown を返す。
+    """Return Markdown that keeps, per `##` section, only the `###` sections with open tasks.
 
-    `###` 見出し外のタスクは完了状態に関わらず出力する。"""
+    Tasks outside any `###` heading are emitted regardless of completion state."""
     tasks = parse_todo_tasks_all(todo_text)
     if not tasks:
         return f"## {MINUTES_SECTION}\n"

@@ -44,10 +44,10 @@ class TestParseCanvasCheckStates:
         md = (
             "## 議事録由来タスク\n"
             "### A\n"
-            "- [x] タスクA （担当: alice）\n"
+            "- [x] task A (\u62c5\u5f53: alice)\n"
         )
         states = parse_canvas_check_states(md)
-        assert states == {"タスクA": True}
+        assert states == {"task A": True}
 
     def test_completed_wins_on_duplicate(self):
         md = (
@@ -115,11 +115,11 @@ class TestApplyCheckStatesToLocal:
         local = (
             "## 議事録由来タスク\n"
             "### A\n"
-            "- [ ] タスクA （担当: alice）2026-03-15\n"
+            "- [ ] task A (\u62c5\u5f53: alice)2026-03-15\n"
         )
-        new_text, changed = apply_check_states_to_local(local, {"タスクA": True})
-        assert "- [x] タスクA （担当: alice）2026-03-15" in new_text
-        assert changed == ["タスクA"]
+        new_text, changed = apply_check_states_to_local(local, {"task A": True})
+        assert "- [x] task A (\u62c5\u5f53: alice)2026-03-15" in new_text
+        assert changed == ["task A"]
 
     def test_empty_local_returns_empty(self):
         new_text, changed = apply_check_states_to_local("", {"タスクA": True})

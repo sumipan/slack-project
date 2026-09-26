@@ -202,7 +202,7 @@ def _jsonl_record(msg: dict, thread_ts: str | None) -> dict:
 
 
 def _append_jsonl_records(jsonl_dir: Path, records: list[dict]) -> None:
-    """records を JST 日付ごとの `YYYY-MM-DD.jsonl` に追記する。既存 id は書かない。"""
+    """Append records to per-JST-date `YYYY-MM-DD.jsonl` files, skipping ids already present."""
     by_date: dict[str, list[dict]] = {}
     for rec in records:
         date = datetime.fromtimestamp(float(rec["ts"] or "0"), tz=_JST).strftime("%Y-%m-%d")
@@ -240,10 +240,10 @@ def fetch_slack_log(
     until: str | None = None,
     jsonl_dir: Path | None = None,
 ) -> tuple[bool, str]:
-    """Slack ログを md に書き出す。
+    """Write the Slack log to md.
 
-    jsonl_dir を指定すると、md に書いた親メッセージと返信を 1 行 1 レコードで
-    `jsonl_dir/YYYY-MM-DD.jsonl`（JST 日付）に追記する（同じ id は書かない）。"""
+    When jsonl_dir is given, also append the parent messages and replies written to md
+    as one record per line to `jsonl_dir/YYYY-MM-DD.jsonl` (JST date), skipping existing ids."""
     try:
         project_name = normalize_project_name(project)
         config = load_project_config(workspace.project_dir(project_name))

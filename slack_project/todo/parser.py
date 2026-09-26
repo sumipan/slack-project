@@ -78,14 +78,15 @@ def resolve_assignee_to_slack_id(name: str, members: dict[str, str]) -> str | No
     return None
 
 
-MINUTES_SECTION = "議事録由来タスク"
+# Heading title of the meeting-minutes task section (escaped to keep the source ASCII).
+MINUTES_SECTION = "\u8b70\u4e8b\u9332\u7531\u6765\u30bf\u30b9\u30af"
 
 
 def _parse_tasks_with_ordinal(todo_text: str) -> tuple[list[str], list[tuple]]:
-    """全 `##` セクションを走査し (headers, rows) を返す内部ヘルパ。
-    headers は `##` 見出しタイトルの出現順リスト、rows は
+    """Internal helper that scans every `##` section and returns (headers, rows).
+    headers lists `##` heading titles in order of appearance; rows is a list of
     (section_ordinal, raw, completed, normalized, assignee, due_iso, section_key,
-    top_section_key) のリスト。section_ordinal は headers のインデックス。"""
+    top_section_key). section_ordinal is an index into headers."""
     headers: list[str] = []
     result: list[tuple] = []
     if not todo_text:
@@ -130,20 +131,20 @@ def _parse_tasks_with_ordinal(todo_text: str) -> tuple[list[str], list[tuple]]:
 def parse_todo_tasks_all(
     todo_text: str,
 ) -> list[tuple[str, bool, str, str | None, str | None, str | None, str]]:
-    """todo.md の全 `##` セクションをパースし、
+    """Parse every `##` section of todo.md and return
     [(raw_line, completed, normalized_text, assignee_name, due_iso, section_key,
-    top_section_key)] を返す。
-    section_key は `###` 見出しのタイトル（見出し外は None）、
-    top_section_key は `##` 見出しのタイトル。最初の `##` より前の行は対象外。"""
+    top_section_key)].
+    section_key is the `###` heading title (None outside a heading);
+    top_section_key is the `##` heading title. Lines before the first `##` are skipped."""
     _headers, rows = _parse_tasks_with_ordinal(todo_text)
     return [row[1:] for row in rows]
 
 
 def parse_todo_tasks(todo_text: str) -> list[tuple[str, bool, str, str | None, str | None, str | None]]:
-    """todo.md の '議事録由来タスク' セクションをパースし、
-    [(raw_line, completed, normalized_text, assignee_name, due_iso, section_key)] を返す。
-    section_key は `###` 見出しのタイトル。見出し外は None。
-    議事録セクションが複数ある場合は最初の 1 つだけを対象とする。"""
+    """Parse the MINUTES_SECTION section of todo.md and return
+    [(raw_line, completed, normalized_text, assignee_name, due_iso, section_key)].
+    section_key is the `###` heading title (None outside a heading).
+    If there are several minutes sections, only the first one is used."""
     headers, rows = _parse_tasks_with_ordinal(todo_text)
     minutes_ordinal = next(
         (i for i, title in enumerate(headers) if MINUTES_SECTION in title), None
