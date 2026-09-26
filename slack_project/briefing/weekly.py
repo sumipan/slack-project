@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -188,6 +189,48 @@ def _format_message(ts: float, user_id: str, text: str, indent: str = "") -> str
     return f"{indent}[{dt.strftime('%Y-%m-%d %H:%M')}] <{user_id}> {text}"
 
 
+def _jsonl_record(msg: dict, thread_ts: str | None) -> dict:
+    ts = msg.get("ts", "")
+    return {
+        "id": ts,
+        "ts": ts,
+        "author": msg.get("user") or msg.get("bot_id") or "unknown",
+        "text": msg.get("text") or "",
+        "thread_ts": thread_ts,
+        "raw": msg,
+    }
+
+
+def _append_jsonl_records(jsonl_dir: Path, records: list[dict]) -> None:
+    """Append records to per-JST-date `YYYY-MM-DD.jsonl` files, skipping ids already present."""
+    by_date: dict[str, list[dict]] = {}
+    for rec in records:
+        date = datetime.fromtimestamp(float(rec["ts"] or "0"), tz=_JST).strftime("%Y-%m-%d")
+        by_date.setdefault(date, []).append(rec)
+
+    jsonl_dir.mkdir(parents=True, exist_ok=True)
+    for date, recs in by_date.items():
+        path = jsonl_dir / f"{date}.jsonl"
+        seen: set[str] = set()
+        if path.exists():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    seen.add(json.loads(line).get("id"))
+                except (json.JSONDecodeError, AttributeError):
+                    continue
+        new_lines: list[str] = []
+        for rec in recs:
+            if rec["id"] in seen:
+                continue
+            seen.add(rec["id"])
+            new_lines.append(json.dumps(rec, ensure_ascii=False))
+        if new_lines:
+            with path.open("a", encoding="utf-8") as f:
+                f.write("\n".join(new_lines) + "\n")
+
+
 def fetch_slack_log(
     workspace: ProjectWorkspace,
     project: str,
@@ -195,7 +238,12 @@ def fetch_slack_log(
     week: str = "last",
     since: str | None = None,
     until: str | None = None,
+    jsonl_dir: Path | None = None,
 ) -> tuple[bool, str]:
+    """Write the Slack log to md.
+
+    When jsonl_dir is given, also append the parent messages and replies written to md
+    as one record per line to `jsonl_dir/YYYY-MM-DD.jsonl` (JST date), skipping existing ids."""
     try:
         project_name = normalize_project_name(project)
         config = load_project_config(workspace.project_dir(project_name))
@@ -219,6 +267,7 @@ def fetch_slack_log(
 
         lines: list[str] = []
         out_of_period_threads: list[str] = []
+        jsonl_records: list[dict] = []
         count = 0
 
         for msg in reversed(messages):
@@ -231,6 +280,7 @@ def fetch_slack_log(
 
             if in_period:
                 lines.append(_format_message(msg_ts, user_id, text))
+                jsonl_records.append(_jsonl_record(msg, None))
                 count += 1
 
             if reply_count > 0:
@@ -249,20 +299,24 @@ def fetch_slack_log(
                     r for r in replies if float(r.get("ts", "0")) >= period_start_ts
                 ]
 
+                thread_ts = msg["ts"]
                 if in_period:
                     for reply in period_replies:
                         r_ts = float(reply.get("ts", "0"))
                         r_user = reply.get("user") or reply.get("bot_id") or "unknown"
                         r_text = reply.get("text") or ""
                         lines.append(_format_message(r_ts, r_user, r_text, indent="    "))
+                        jsonl_records.append(_jsonl_record(reply, thread_ts))
                         count += 1
                 elif period_replies:
                     section_lines = [_format_message(msg_ts, user_id, text)]
+                    jsonl_records.append(_jsonl_record(msg, None))
                     for reply in period_replies:
                         r_ts = float(reply.get("ts", "0"))
                         r_user = reply.get("user") or reply.get("bot_id") or "unknown"
                         r_text = reply.get("text") or ""
                         section_lines.append(_format_message(r_ts, r_user, r_text, indent="    "))
+                        jsonl_records.append(_jsonl_record(reply, thread_ts))
                         count += 1
                     out_of_period_threads.append("\n".join(section_lines))
 
@@ -279,6 +333,9 @@ def fetch_slack_log(
         end_str = period_end.strftime("%Y%m%d")
         out_path = assets_dir / f"{start_str}_{end_str}_Slackのログ.md"
         out_path.write_text(content, encoding="utf-8")
+
+        if jsonl_dir is not None:
+            _append_jsonl_records(Path(jsonl_dir), jsonl_records)
 
         return True, f"取得件数: {count}件 → {out_path}"
     except Exception as exc:

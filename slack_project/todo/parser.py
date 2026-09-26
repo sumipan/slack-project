@@ -78,26 +78,34 @@ def resolve_assignee_to_slack_id(name: str, members: dict[str, str]) -> str | No
     return None
 
 
-def parse_todo_tasks(todo_text: str) -> list[tuple[str, bool, str, str | None, str | None, str | None]]:
-    """todo.md の '議事録由来タスク' セクションをパースし、
-    [(raw_line, completed, normalized_text, assignee_name, due_iso, section_key)] を返す。
-    section_key は `###` 見出しのタイトル。見出し外は None。"""
+# Heading title of the meeting-minutes task section (built from code points to keep the source ASCII).
+MINUTES_SECTION = "".join(
+    map(chr, (0x8B70, 0x4E8B, 0x9332, 0x7531, 0x6765, 0x30BF, 0x30B9, 0x30AF))
+)
+
+
+def _parse_tasks_with_ordinal(todo_text: str) -> tuple[list[str], list[tuple]]:
+    """Internal helper that scans every `##` section and returns (headers, rows).
+    headers lists `##` heading titles in order of appearance; rows is a list of
+    (section_ordinal, raw, completed, normalized, assignee, due_iso, section_key,
+    top_section_key). section_ordinal is an index into headers."""
+    headers: list[str] = []
+    result: list[tuple] = []
     if not todo_text:
-        return []
-    in_section = False
+        return headers, result
+    top_key: str | None = None
     current_section_key: str | None = None
-    result: list[tuple[str, bool, str, str | None, str | None, str | None]] = []
     for line in todo_text.split("\n"):
-        if line.strip().startswith("## ") and "議事録由来タスク" in line:
-            in_section = True
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            top_key = stripped[3:].strip()
+            headers.append(top_key)
             current_section_key = None
             continue
-        if in_section and line.strip().startswith("## "):
-            break
-        if not in_section:
+        if top_key is None:
             continue
-        if line.strip().startswith("### "):
-            key = line.strip()[4:].strip()
+        if stripped.startswith("### "):
+            key = stripped[4:].strip()
             current_section_key = key or None
             continue
         m = RE_TASK_LINE.match(line)
@@ -107,8 +115,45 @@ def parse_todo_tasks(todo_text: str) -> list[tuple[str, bool, str, str | None, s
             normalized = normalize_task_text(body)
             assignee = parse_assignee(body)
             due_iso = parse_due_date(body)
-            result.append((line.strip(), completed, normalized, assignee, due_iso, current_section_key))
-    return result
+            result.append(
+                (
+                    len(headers) - 1,
+                    stripped,
+                    completed,
+                    normalized,
+                    assignee,
+                    due_iso,
+                    current_section_key,
+                    top_key,
+                )
+            )
+    return headers, result
+
+
+def parse_todo_tasks_all(
+    todo_text: str,
+) -> list[tuple[str, bool, str, str | None, str | None, str | None, str]]:
+    """Parse every `##` section of todo.md and return
+    [(raw_line, completed, normalized_text, assignee_name, due_iso, section_key,
+    top_section_key)].
+    section_key is the `###` heading title (None outside a heading);
+    top_section_key is the `##` heading title. Lines before the first `##` are skipped."""
+    _headers, rows = _parse_tasks_with_ordinal(todo_text)
+    return [row[1:] for row in rows]
+
+
+def parse_todo_tasks(todo_text: str) -> list[tuple[str, bool, str, str | None, str | None, str | None]]:
+    """Parse the MINUTES_SECTION section of todo.md and return
+    [(raw_line, completed, normalized_text, assignee_name, due_iso, section_key)].
+    section_key is the `###` heading title (None outside a heading).
+    If there are several minutes sections, only the first one is used."""
+    headers, rows = _parse_tasks_with_ordinal(todo_text)
+    minutes_ordinal = next(
+        (i for i, title in enumerate(headers) if MINUTES_SECTION in title), None
+    )
+    if minutes_ordinal is None:
+        return []
+    return [row[1:7] for row in rows if row[0] == minutes_ordinal]
 
 
 def get_completed_sections(todo_text: str) -> list[str]:

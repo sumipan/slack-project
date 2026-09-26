@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from slack_project.todo.canvas import build_canvas_markdown, push_to_canvas
+from slack_project.todo.parser import MINUTES_SECTION
 
 
 def test_build_canvas_markdown_excludes_fully_completed_sections():
@@ -74,3 +75,57 @@ def test_push_to_canvas_calls_slack_api(tmp_path, monkeypatch):
 
     assert success is True
     assert post_mock.call_count == 1
+
+
+MINUTES_ONLY_TODO = (
+    "# todo\n"
+    f"## {MINUTES_SECTION}\n"
+    "- [ ] loose task\n"
+    "### s1\n"
+    "- [x] d1\n"
+    "### s2\n"
+    "- [x] d2\n"
+    "- [ ] t2 (owner: alice) 2026-06-01\n"
+)
+
+
+def test_build_canvas_markdown_minutes_only_is_unchanged():
+    expected = (
+        f"## {MINUTES_SECTION}\n"
+        "- [ ] loose task\n"
+        "### s2\n"
+        "- [x] d2\n"
+        "- [ ] t2 (owner: alice) 2026-06-01\n"
+    )
+    assert build_canvas_markdown(MINUTES_ONLY_TODO) == expected
+
+
+def test_build_canvas_markdown_empty_is_unchanged():
+    assert build_canvas_markdown("") == f"## {MINUTES_SECTION}\n"
+    assert build_canvas_markdown("# nothing\n") == f"## {MINUTES_SECTION}\n"
+
+
+def test_build_canvas_markdown_multiple_sections():
+    todo_text = (
+        "## A\n"
+        "### a-done\n"
+        "- [x] a1\n"
+        "### a-open\n"
+        "- [ ] a2\n"
+        "\n"
+        "## B\n"
+        "- [ ] b1\n"
+        "### b-sub\n"
+        "- [ ] b2\n"
+    )
+    rendered = build_canvas_markdown(todo_text)
+    assert rendered == (
+        "## A\n"
+        "### a-open\n"
+        "- [ ] a2\n"
+        "\n"
+        "## B\n"
+        "- [ ] b1\n"
+        "### b-sub\n"
+        "- [ ] b2\n"
+    )
