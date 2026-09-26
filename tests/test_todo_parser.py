@@ -2,11 +2,13 @@ from datetime import datetime
 
 
 from slack_project.todo.parser import (
+    MINUTES_SECTION,
     get_completed_sections,
     normalize_task_text,
     parse_assignee,
     parse_due_date,
     parse_todo_tasks,
+    parse_todo_tasks_all,
     resolve_assignee_to_slack_id,
 )
 
@@ -209,3 +211,68 @@ def test_resolve_assignee_not_found():
 
 def test_resolve_assignee_empty_dict():
     assert resolve_assignee_to_slack_id("太郎", {}) is None
+
+
+# ---------------------------------------------------------------------------
+# parse_todo_tasks_all
+# ---------------------------------------------------------------------------
+
+
+def test_parse_todo_tasks_all_returns_every_h2_section():
+    text = (
+        "- [ ] preamble\n"
+        "## A\n"
+        "- [ ] a0\n"
+        "### sub-a\n"
+        "- [x] a1\n"
+        f"## {MINUTES_SECTION}\n"
+        "### 2026-05-15 weekly\n"
+        "- [ ] m1\n"
+        "## B\n"
+        "- [ ] b1\n"
+    )
+    result = parse_todo_tasks_all(text)
+    assert [(r[2], r[5], r[6]) for r in result] == [
+        ("a0", None, "A"),
+        ("a1", "sub-a", "A"),
+        ("m1", "2026-05-15 weekly", MINUTES_SECTION),
+        ("b1", None, "B"),
+    ]
+    assert all(len(r) == 7 for r in result)
+    assert result[1][1] is True
+
+
+def test_parse_todo_tasks_all_empty():
+    assert parse_todo_tasks_all("") == []
+
+
+def test_parse_todo_tasks_unchanged_with_other_sections():
+    text = (
+        "## A\n"
+        "- [ ] a0\n"
+        f"## {MINUTES_SECTION}\n"
+        "### s1\n"
+        "- [ ] m1 2026-06-01\n"
+        "## B\n"
+        "- [ ] b1\n"
+    )
+    result = parse_todo_tasks(text)
+    assert result == [("- [ ] m1 2026-06-01", False, "m1", None, "2026-06-01", "s1")]
+
+
+def test_parse_todo_tasks_matches_all_filtered_by_minutes_section():
+    text = f"## {MINUTES_SECTION}\n- [ ] x\n### s\n- [x] y\n## other\n- [ ] z\n"
+    expected = [
+        r[:6] for r in parse_todo_tasks_all(text) if r[6] == MINUTES_SECTION
+    ]
+    assert parse_todo_tasks(text) == expected
+
+
+def test_parse_todo_tasks_only_first_minutes_section():
+    text = (
+        f"## {MINUTES_SECTION}\n"
+        "## other\n"
+        f"## {MINUTES_SECTION}\n"
+        "- [ ] late\n"
+    )
+    assert parse_todo_tasks(text) == []

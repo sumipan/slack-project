@@ -5,6 +5,7 @@ from slack_project.todo.canvas_fetch import (
     apply_check_states_to_local,
     parse_canvas_check_states,
 )
+from slack_project.todo.parser import MINUTES_SECTION
 
 
 class TestParseCanvasCheckStates:
@@ -43,7 +44,7 @@ class TestParseCanvasCheckStates:
         md = (
             "## 議事録由来タスク\n"
             "### A\n"
-            "- [x] タスクA （担当: やっさん）\n"
+            "- [x] タスクA （担当: alice）\n"
         )
         states = parse_canvas_check_states(md)
         assert states == {"タスクA": True}
@@ -93,30 +94,31 @@ class TestApplyCheckStatesToLocal:
         assert "- [ ] タスクB" in new_text
         assert changed == []
 
-    def test_outside_section_not_modified(self):
+    def test_before_first_h2_not_modified(self):
+        # #4083: import now covers every `##` section; only lines before the first `##` are skipped.
         local = (
-            "## 別セクション\n"
-            "- [ ] 対象外タスク\n"
+            "# title\n"
+            "- [ ] preamble task\n"
             "\n"
-            "## 議事録由来タスク\n"
+            f"## {MINUTES_SECTION}\n"
             "### A\n"
-            "- [ ] 対象タスク\n"
+            "- [ ] target task\n"
         )
         new_text, changed = apply_check_states_to_local(
-            local, {"対象外タスク": True, "対象タスク": True}
+            local, {"preamble task": True, "target task": True}
         )
-        assert "- [ ] 対象外タスク" in new_text
-        assert "- [x] 対象タスク" in new_text
-        assert changed == ["対象タスク"]
+        assert "- [ ] preamble task" in new_text
+        assert "- [x] target task" in new_text
+        assert changed == ["target task"]
 
     def test_normalized_match_with_metadata(self):
         local = (
             "## 議事録由来タスク\n"
             "### A\n"
-            "- [ ] タスクA （担当: やっさん）2026-03-15\n"
+            "- [ ] タスクA （担当: alice）2026-03-15\n"
         )
         new_text, changed = apply_check_states_to_local(local, {"タスクA": True})
-        assert "- [x] タスクA （担当: やっさん）2026-03-15" in new_text
+        assert "- [x] タスクA （担当: alice）2026-03-15" in new_text
         assert changed == ["タスクA"]
 
     def test_empty_local_returns_empty(self):
@@ -135,3 +137,42 @@ class TestApplyCheckStatesToLocal:
         new_text, _ = apply_check_states_to_local(local, {"タスクA": True})
         assert "メモ行" in new_text
         assert "- [x] 既に完了" in new_text
+
+
+class TestMultipleSections:
+    LOCAL = (
+        "## A\n"
+        "### sub-a\n"
+        "- [ ] task a1\n"
+        "\n"
+        "## B\n"
+        "### sub-b\n"
+        "- [ ] task b1\n"
+        "- [x] task b2\n"
+    )
+    CANVAS = (
+        "## A\n"
+        "### sub-a\n"
+        "- [ ] task a1\n"
+        "\n"
+        "## B\n"
+        "### sub-b\n"
+        "- [x] task b1\n"
+        "- [ ] task b2\n"
+    )
+
+    def test_parse_canvas_reads_all_sections(self):
+        states = parse_canvas_check_states(self.CANVAS)
+        assert states == {"task a1": False, "task b1": True, "task b2": False}
+
+    def test_checked_in_section_b_is_imported(self):
+        states = parse_canvas_check_states(self.CANVAS)
+        new_text, changed = apply_check_states_to_local(self.LOCAL, states)
+        assert "- [x] task b1" in new_text
+        assert changed == ["task b1"]
+
+    def test_unchecked_on_canvas_keeps_local_checked(self):
+        states = parse_canvas_check_states(self.CANVAS)
+        new_text, _ = apply_check_states_to_local(self.LOCAL, states)
+        assert "- [x] task b2" in new_text
+        assert "- [ ] task a1" in new_text

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Protocol
 
 from slack_project.config_loader import get_slack_token, load_project_config
-from slack_project.todo.parser import parse_todo_tasks
+from slack_project.todo.parser import MINUTES_SECTION, parse_todo_tasks_all
 
 
 class ProjectWorkspace(Protocol):
@@ -15,33 +15,41 @@ class ProjectWorkspace(Protocol):
 
 
 def build_canvas_markdown(todo_text: str) -> str:
-    """未完了タスクを含むセクションだけを抽出した Markdown を返す。"""
-    tasks = parse_todo_tasks(todo_text)
+    """`##` セクションごとに、未完了タスクを含む `###` セクションだけを抽出した Markdown を返す。
+
+    `###` 見出し外のタスクは完了状態に関わらず出力する。"""
+    tasks = parse_todo_tasks_all(todo_text)
     if not tasks:
-        return "## 議事録由来タスク\n"
+        return f"## {MINUTES_SECTION}\n"
 
-    section_tasks: dict[str | None, list[tuple[str, bool]]] = {}
-    for raw_line, completed, _norm, _assignee, _due, section_key in tasks:
-        section_tasks.setdefault(section_key, []).append((raw_line, completed))
+    grouped: dict[str, dict[str | None, list[tuple[str, bool]]]] = {}
+    for raw_line, completed, _norm, _assignee, _due, section_key, top_key in tasks:
+        grouped.setdefault(top_key, {}).setdefault(section_key, []).append(
+            (raw_line, completed)
+        )
 
-    lines: list[str] = ["## 議事録由来タスク"]
+    blocks: list[str] = []
+    for top_key, section_tasks in grouped.items():
+        lines: list[str] = [f"## {top_key}"]
 
-    if None in section_tasks:
-        for raw_line, _completed in section_tasks[None]:
-            lines.append(raw_line)
+        if None in section_tasks:
+            for raw_line, _completed in section_tasks[None]:
+                lines.append(raw_line)
 
-    for section_key, rows in section_tasks.items():
-        if section_key is None:
-            continue
-        if not rows:
-            continue
-        if all(completed for _raw, completed in rows):
-            continue
-        lines.append(f"### {section_key}")
-        for raw_line, _completed in rows:
-            lines.append(raw_line)
+        for section_key, rows in section_tasks.items():
+            if section_key is None:
+                continue
+            if not rows:
+                continue
+            if all(completed for _raw, completed in rows):
+                continue
+            lines.append(f"### {section_key}")
+            for raw_line, _completed in rows:
+                lines.append(raw_line)
 
-    return "\n".join(lines).rstrip() + "\n"
+        blocks.append("\n".join(lines))
+
+    return "\n\n".join(blocks).rstrip() + "\n"
 
 
 def push_to_canvas(
