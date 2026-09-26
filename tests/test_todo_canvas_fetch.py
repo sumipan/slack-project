@@ -7,6 +7,9 @@ from slack_project.todo.canvas_fetch import (
 )
 from slack_project.todo.parser import MINUTES_SECTION
 
+# Assignee label (built from code points to keep the source ASCII).
+ASSIGNEE_LABEL = "".join(map(chr, (0x62C5, 0x5F53)))
+
 
 class TestParseCanvasCheckStates:
     def test_mixed_states(self):
@@ -44,7 +47,7 @@ class TestParseCanvasCheckStates:
         md = (
             "## 議事録由来タスク\n"
             "### A\n"
-            "- [x] task A (\u62c5\u5f53: alice)\n"
+            f"- [x] task A ({ASSIGNEE_LABEL}: alice)\n"
         )
         states = parse_canvas_check_states(md)
         assert states == {"task A": True}
@@ -115,10 +118,10 @@ class TestApplyCheckStatesToLocal:
         local = (
             "## 議事録由来タスク\n"
             "### A\n"
-            "- [ ] task A (\u62c5\u5f53: alice)2026-03-15\n"
+            f"- [ ] task A ({ASSIGNEE_LABEL}: alice)2026-03-15\n"
         )
         new_text, changed = apply_check_states_to_local(local, {"task A": True})
-        assert "- [x] task A (\u62c5\u5f53: alice)2026-03-15" in new_text
+        assert f"- [x] task A ({ASSIGNEE_LABEL}: alice)2026-03-15" in new_text
         assert changed == ["task A"]
 
     def test_empty_local_returns_empty(self):

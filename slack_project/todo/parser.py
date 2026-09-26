@@ -78,8 +78,10 @@ def resolve_assignee_to_slack_id(name: str, members: dict[str, str]) -> str | No
     return None
 
 
-# Heading title of the meeting-minutes task section (escaped to keep the source ASCII).
-MINUTES_SECTION = "\u8b70\u4e8b\u9332\u7531\u6765\u30bf\u30b9\u30af"
+# Heading title of the meeting-minutes task section (built from code points to keep the source ASCII).
+MINUTES_SECTION = "".join(
+    map(chr, (0x8B70, 0x4E8B, 0x9332, 0x7531, 0x6765, 0x30BF, 0x30B9, 0x30AF))
+)
 
 
 def _parse_tasks_with_ordinal(todo_text: str) -> tuple[list[str], list[tuple]]:
