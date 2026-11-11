@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.3.1] - 2026-11-11
+
+- Changed: import `AuditContext`, `PipelineState`, and `get_adapter` from public `ghdag.pipeline` instead of deep submodule paths
+- Changed: require `ghdag>=0.123.0` (first release exporting the three symbols from `ghdag.pipeline`)
+
 ## [0.3.0] - 2026-09-26
 
 - feat(briefing): `fetch_slack_log(..., jsonl_dir=None)` appends parent messages and replies to `jsonl_dir/YYYY-MM-DD.jsonl` (JST date) with `id` / `ts` / `author` / `text` / `thread_ts` / `raw`, skipping ids already present. Default output is unchanged

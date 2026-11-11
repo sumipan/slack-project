@@ -1,9 +1,25 @@
+import ast
 import json
 import re
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-
 from slack_project.ghdag_bridge import submit_order
+
+
+def test_ghdag_bridge_imports_only_public_pipeline_api():
+    """Refs: sumipan/nexus#6438"""
+    bridge_path = Path(__file__).resolve().parent.parent / "slack_project" / "ghdag_bridge.py"
+    tree = ast.parse(bridge_path.read_text())
+    ghdag_imports = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("ghdag")
+    ]
+    assert len(ghdag_imports) == 1
+    assert ghdag_imports[0].module == "ghdag.pipeline"
+    names = {alias.name for alias in ghdag_imports[0].names}
+    assert names == {"AuditContext", "PipelineState", "get_adapter"}
 
 
 class TestSubmitOrder:
