@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.3.2] - 2026-11-12
+
+- Changed: use `get_command_adapter` from `ghdag.pipeline` (ghdag v0.131.0 renamed `get_adapter`)
+- Changed: require `ghdag>=0.131.0`
+
 ## [0.3.1] - 2026-11-11
 
 - Changed: import `AuditContext`, `PipelineState`, and `get_adapter` from public `ghdag.pipeline` instead of deep submodule paths

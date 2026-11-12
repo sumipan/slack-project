@@ -19,7 +19,7 @@ def test_ghdag_bridge_imports_only_public_pipeline_api():
     assert len(ghdag_imports) == 1
     assert ghdag_imports[0].module == "ghdag.pipeline"
     names = {alias.name for alias in ghdag_imports[0].names}
-    assert names == {"AuditContext", "PipelineState", "get_adapter"}
+    assert names == {"AuditContext", "PipelineState", "get_command_adapter"}
 
 
 class TestSubmitOrder:
