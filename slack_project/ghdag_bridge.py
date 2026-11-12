@@ -5,11 +5,11 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from ghdag.pipeline import AuditContext, PipelineState, get_adapter
+from ghdag.pipeline import AuditContext, PipelineState, get_command_adapter
 
 _TZ = ZoneInfo("Asia/Tokyo")
 
-_claude_adapter = get_adapter("claude")
+_claude_adapter = get_command_adapter("claude")
 
 
 def submit_order(
